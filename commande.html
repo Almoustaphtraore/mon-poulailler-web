@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#2F6B3F"><title>Commander des poulets</title>
+<style>
+:root{--g:#2F6B3F;--gd:#1F4A2B;--gb:#E6F0E8;--y:#F2B01E;--ink:#1F1F1F;--mut:#5F5F5F;--red:#C62828}
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#FBF8EE;color:var(--ink)}
+.w{max-width:480px;margin:0 auto;padding:0 16px 40px}.hd{background:var(--g);color:#fff;padding:22px 16px;border-bottom:6px solid var(--y)}.hd h1{margin:0;font-size:22px}.hd p{margin:4px 0 0;opacity:.9;font-size:14px}
+.box{background:#fff;border-radius:14px;padding:16px;margin-top:14px;box-shadow:0 2px 10px rgba(0,0,0,.06)}.big{font-size:30px;font-weight:800;color:var(--g)}
+label{display:block;font-weight:600;font-size:14px;margin:12px 0 4px}input,textarea{width:100%;font:inherit;padding:12px;border:1px solid #cfd8d1;border-radius:10px;background:#fff}
+button{width:100%;margin-top:16px;height:52px;border:0;border-radius:12px;background:var(--g);color:#fff;font:inherit;font-weight:700;font-size:17px}button:disabled{opacity:.5}
+.sm{font-size:13px;color:var(--mut)}.ok{background:var(--gb);color:var(--gd)}.no{background:#FDECEC;color:var(--red)}.t{display:flex;justify-content:space-between;align-items:center}
+</style></head><body>
+<div class="hd"><h1 id="farm">Commander des poulets</h1><p>Poulets de chair</p></div>
+<div class="w" id="app"><div class="box sm">Chargement…</div></div>
+<script>
+(function(){
+var q=new URLSearchParams(location.search),P=q.get('p')||'',K=q.get('k')||'',N=(q.get('n')||'').slice(0,40);
+var app=document.getElementById('app');if(N){document.getElementById('farm').textContent=N;document.title='Commander · '+N;}
+var STL={croissance:'Poulets en croissance',bientot:'Bientôt prêts',pret:'Prêts à la vente'};
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+function fmt(n){return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g,' ');}
+function base(){return 'https://firestore.googleapis.com/v1/projects/'+encodeURIComponent(P)+'/databases/(default)/documents';}
+function fv(f,k){var v=f&&f[k];if(!v){return undefined;}return v.stringValue!==undefined?v.stringValue:v.integerValue!==undefined?Number(v.integerValue):v.doubleValue;}
+if(!P||!K){app.innerHTML='<div class="box no">Lien incomplet. Demandez le lien au vendeur.</div>';return;}
+fetch(base()+'/pub/state?key='+encodeURIComponent(K)).then(function(r){return r.ok?r.json():null;}).then(function(j){
+  var f=j&&j.fields,prix=+fv(f,'prix')||0,st=fv(f,'statut'),open=f?(+fv(f,'cmd')===1):false,dispo=+fv(f,'dispo')||0,msg=fv(f,'msg')||'';
+  if(!f||!(prix>0)){app.innerHTML='<div class="box">Le vendeur n\'a pas encore publié son prix. Revenez plus tard ou appelez-le.</div>';return;}
+  var h='<div class="box"><div class="sm">Prix par poulet</div><div class="big">'+fmt(prix)+' FCFA</div><div class="sm" style="margin-top:6px">'+esc(STL[st]||'')+(dispo>0?' · '+dispo+' poulets disponibles':'')+'</div>'+(msg?'<div class="sm" style="margin-top:6px">'+esc(msg)+'</div>':'')+'</div>';
+  if(!open){app.innerHTML=h+'<div class="box no"><b>Les commandes sont fermées pour le moment.</b><div class="sm">Revenez plus tard.</div></div>';return;}
+  h+='<div class="box"><b>Votre commande</b><label for="c">Votre nom</label><input id="c" maxlength="60" autocomplete="name"><label for="t">Votre téléphone</label><input id="t" type="tel" inputmode="tel" maxlength="30" autocomplete="tel"><label for="q">Nombre de poulets</label><input id="q" type="text" inputmode="numeric"><label for="l">Date souhaitée</label><input id="l" type="date"><label for="n">Lieu de livraison / remarque</label><textarea id="n" rows="2" maxlength="200"></textarea>'+
+  '<div class="t" style="margin-top:14px"><b>Total</b><span class="big" id="tot">0</span></div><button id="go" type="button">Envoyer ma commande</button><div class="sm" style="margin-top:10px">Aucun paiement en ligne. Le vendeur vous appellera pour confirmer.</div></div>';
+  app.innerHTML=h;
+  var qi=document.getElementById('q');
+  function calc(){var n=Math.floor(Number(qi.value.replace(/\s/g,'')))||0;document.getElementById('tot').textContent=fmt(n*prix)+' F';return n;}
+  qi.oninput=calc;
+  document.getElementById('go').onclick=function(){
+    var b=this,c=document.getElementById('c').value.trim(),t=document.getElementById('t').value.trim(),n=calc();
+    if(!c||!t||!(n>0)){alert('Entrez votre nom, votre téléphone et le nombre de poulets.');return;}
+    if(n>5000){alert('Quantité trop grande.');return;}
+    var id='w'+Date.now().toString(36)+Math.random().toString(36).slice(2,8),d=new Date(),ds=d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);
+    var o={id:{stringValue:id},type:{stringValue:'commande'},who:{stringValue:'Client en ligne'},date:{stringValue:ds},client:{stringValue:c.slice(0,60)},tel:{stringValue:t.slice(0,30)},qty:{integerValue:String(n)},pu:{integerValue:String(Math.round(prix))},recu:{integerValue:'0'},pay:{stringValue:'Espèces'},ts:{integerValue:String(Date.now())}};
+    var l=document.getElementById('l').value,nt=document.getElementById('n').value.trim();
+    if(l){o.livr={stringValue:l};}if(nt){o.note={stringValue:nt.slice(0,200)};}
+    b.disabled=true;b.textContent='Envoi…';
+    fetch(base()+'/reports?documentId='+encodeURIComponent(id)+'&key='+encodeURIComponent(K),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fields:o})}).then(function(r){
+      if(!r.ok){throw 0;}
+      app.innerHTML='<div class="box ok"><b>✓ Commande envoyée</b><div class="sm" style="color:inherit;margin-top:6px">'+n+' poulet'+(n>1?'s':'')+' · '+fmt(n*prix)+' FCFA. Le vendeur vous appellera au '+esc(t)+'.</div></div>';
+    }).catch(function(){b.disabled=false;b.textContent='Envoyer ma commande';alert('Envoi impossible. Vérifiez internet et réessayez.');});
+  };
+}).catch(function(){app.innerHTML='<div class="box no">Pas de connexion internet. Réessayez.</div>';});
+})();
+</script></body></html>

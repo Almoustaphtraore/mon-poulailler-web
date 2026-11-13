@@ -588,9 +588,10 @@ function vEmployes(){
   (cfg.syncErr?'<div class="sm mort">'+esc(cfg.syncErr)+'</div>':(cfg.lastSync?'<div class="sm" style="color:var(--greenDk)">✓ Connecté · '+hm(cfg.lastSync)+'</div>':''))+'</div>'+
   (ready?'<div class="card"><div class="h2">2. Vos gérants</div><div class="sm" style="margin-bottom:10px">Ajoutez chaque gérant avec son prénom. Donnez-lui son code personnel : son nom apparaîtra sur tout ce qu\'il envoie.</div>'+
     '<div class="row fld" style="align-items:flex-end"><div style="flex:2"><label class="l" for="f_gname">Prénom du gérant</label><input class="in" id="f_gname" type="text" placeholder="ex. Awa"></div><div><button class="btn sm" type="button" data-gadd="1" style="margin:0">Ajouter</button></div></div>'+
-    (ger.length?ger.map(function(g){var c=codeFor(g);return '<div style="border-top:1px solid var(--pB);padding:12px 0"><b>'+esc(g)+'</b><div class="row" style="margin-top:8px"><button class="btn alt sm" type="button" data-gshare="'+esc(g)+'" style="margin:0">Partager le code</button><button class="btn alt sm" type="button" data-gcopy="'+esc(g)+'" style="margin:0">Copier</button><button class="btn danger sm" type="button" data-gdel="'+esc(g)+'" style="margin:0">Retirer</button></div><details style="margin-top:8px"><summary class="sm">Voir le code</summary><textarea class="in" rows="3" readonly>'+esc(c)+'</textarea></details></div>';}).join(''):'<div class="sm">Aucun gérant pour le moment.</div>')+
-    '<div class="sm" style="margin-top:10px">Chaque gérant installe Mon Poulailler sur son téléphone, choisit « Je suis un gérant » et colle son code.</div></div>':'')+'</div>';
+    (ger.length?ger.map(function(g){var c=codeFor(g);return '<div style="border-top:1px solid var(--pB);padding:12px 0"><b>'+esc(g)+'</b><div class="row" style="margin-top:8px"><button class="btn alt sm" type="button" data-gshare="'+esc(g)+'" style="margin:0">Inviter (code court)</button><button class="btn alt sm" type="button" data-gcopy="'+esc(g)+'" style="margin:0">Copier</button><button class="btn danger sm" type="button" data-gdel="'+esc(g)+'" style="margin:0">Retirer</button></div><details style="margin-top:8px"><summary class="sm">Voir le code</summary><textarea class="in" rows="3" readonly>'+esc(c)+'</textarea></details></div>';}).join(''):'<div class="sm">Aucun gérant pour le moment.</div>')+
+    '<div class="sm" style="margin-top:10px">Chaque gérant installe Mon Poulailler sur son téléphone, choisit « Je suis un gérant » et tape son code court (ou colle son long code).</div></div>'+orderCard():'')+'</div>';
   return {html:html,theme:'t-green',init:function(){
+    orderBind();
     $('#savefb').onclick=function(){
       var p=$('#f_proj').value.trim(),k=$('#f_key').value.trim(),m=$('#f_mail').value.trim(),w=$('#f_pass').value;
       if(!p||!k||!m||!w){toast('Remplissez les 4 champs');return;}
@@ -711,9 +712,16 @@ function vRole(){
 }
 function vWSetup(){
   return {html:'<div class="screen"><div class="welcome"><div class="logo">'+LOGO+'</div><h1>Configuration gérant</h1><p>Demandez votre code personnel au propriétaire.</p></div><form onsubmit="return false">'+
+    '<div class="fld"><label class="l" for="f_short">Code court (6 caractères)</label><input class="in" id="f_short" type="text" autocapitalize="characters" maxlength="8" placeholder="ex. K7M2QX" style="letter-spacing:3px;font-size:20px"></div><button class="btn" type="button" id="short">Se connecter avec le code court</button>'+
+    '<div class="sm" style="text-align:center;margin:14px 0">ou, avec un long code</div>'+
     '<div class="fld"><label class="l" for="f_code">Votre code</label><textarea class="in" id="f_code" rows="4" autocapitalize="none" placeholder="Collez ici le code qui commence par PB1."></textarea></div>'+
     '<button class="btn" type="button" id="save">Activer</button>'+
     '<button class="btn alt" type="button" data-role="">Retour</button></form></div>',theme:'t-green',init:function(){
+    $('#short').onclick=async function(){
+      var b=this;b.disabled=true;
+      try{var d=await invUse($('#f_short').value);cfg.worker={proj:String(d.p),key:String(d.k),who:String(d.w).slice(0,40),tok:d.t?String(d.t):''};saveCfg();toast('Bienvenue '+cfg.worker.who);location.hash='#/accueil';route();}
+      catch(e){toast(errMsg(e));b.disabled=false;}
+    };
     $('#save').onclick=function(){
       var code=$('#f_code').value.replace(/\s/g,''),o=null;
       try{if(/^PB1\./.test(code)){o=b64d(code.slice(4));}}catch(e){}
@@ -811,9 +819,9 @@ app.addEventListener('click',function(e){
     cfg.gerants.push(nm);saveCfg();route();return;
   }
   if((el=t.closest('[data-gshare]'))){
-    var g1=el.dataset.gshare;
-    if(window.AndroidBridge&&window.AndroidBridge.shareText){window.AndroidBridge.shareText('Code Mon Poulailler pour '+g1+' :\n'+codeFor(g1));}
-    else{toast(copyText(codeFor(g1))?'Code copié':'Ouvrez « Voir le code » et copiez-le');}
+    var g1=el.dataset.gshare;toast('Création du code…');
+    invCreate(g1).then(function(id){shareOrCopy('Mon Poulailler : pour vous connecter comme gérant ('+g1+'), installez l\'application, touchez « Je suis un gérant » et tapez ce code dans la case « Code court » : '+id+'\nCode valable 7 jours.','Code copié : '+id);}).catch(function(e){
+      toast(errMsg(e));shareOrCopy('Code Mon Poulailler pour '+g1+' :\n'+codeFor(g1),'Code copié');});
     return;
   }
   if((el=t.closest('[data-gcopy]'))){toast(copyText(codeFor(el.dataset.gcopy))?'Code copié':'Ouvrez « Voir le code » et copiez-le');return;}
@@ -1226,6 +1234,45 @@ function venPayBind(vk){
   };
 }
 
+
+/* ---------- Code court gérant + lien de commande en ligne ---------- */
+var ORDER_BASE='https://almoustaphtraore.github.io/mon-poulailler-web/commande.html';
+function invCode(){var A='ABCDEFGHJKLMNPQRSTUVWXYZ23456789',b=new Uint8Array(6),s='';try{crypto.getRandomValues(b);}catch(e){for(var i=0;i<6;i++){b[i]=Math.floor(Math.random()*256);}}for(var j=0;j<6;j++){s+=A.charAt(b[j]%32);}return s;}
+async function invCreate(name){
+  if(!cenOn()){throw new Error('Code court indisponible');}
+  var c=codeFor(name);
+  for(var t=0;t<4;t++){
+    var id=invCode();
+    var r=await fetchT(fsBase(CENTER.proj)+'/invites?documentId='+id+'&key='+encodeURIComponent(CENTER.key),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(toFs({c:c,ts:Date.now()}))},15000);
+    if(r.ok){return id;}
+    if(r.status!==409){throw new Error('Création du code impossible ('+r.status+')');}
+  }
+  throw new Error('Réessayez dans un instant');
+}
+async function invUse(code){
+  var id=normDev(code);if(id.length!==6){throw new Error('Le code a 6 caractères');}
+  var r=await fetchT(fsBase(CENTER.proj)+'/invites/'+id+'?key='+encodeURIComponent(CENTER.key),{},12000);
+  if(r.status===404){throw new Error('Code inconnu. Vérifiez-le ou demandez-en un nouveau.');}
+  if(!r.ok){throw new Error('Erreur ('+r.status+')');}
+  var o=fromFs((await r.json()).fields);
+  if(Date.now()-(+o.ts||0)>7*864e5){throw new Error('Ce code a expiré. Demandez-en un nouveau.');}
+  var d=null;try{d=b64d(String(o.c||'').slice(4));}catch(e){}
+  if(!d||!d.p||!d.k||!d.w){throw new Error('Code invalide');}
+  return d;
+}
+function orderLink(){var f=cfg.fb||{};return ORDER_BASE+'?p='+encodeURIComponent(f.proj||'')+'&k='+encodeURIComponent(f.key||'')+(cfg.farm?'&n='+encodeURIComponent(cfg.farm):'');}
+function orderCard(){
+  return '<div class="card"><div class="h2">3. Lien de commande pour vos clients</div><div class="sm" style="margin-bottom:10px">Vos clients ouvrent ce lien, voient votre prix du jour et envoient leur commande. Elle arrive dans « À valider ». Aucun paiement en ligne.</div>'+
+  '<div class="fld"><label class="l" for="f_farm">Nom de votre ferme (affiché au client)</label><input class="in" id="f_farm" type="text" maxlength="40" value="'+esc(cfg.farm||'')+'" placeholder="ex. Ferme Traoré"></div>'+
+  '<div class="row"><button class="btn sm" type="button" id="ord_sh" style="margin:0">Partager le lien</button><button class="btn alt sm" type="button" id="ord_cp" style="margin:0">Copier</button></div></div>';
+}
+function orderBind(){
+  var f=$('#f_farm');if(!f){return;}
+  f.oninput=function(){cfg.farm=f.value.trim().slice(0,40);saveCfg();};
+  $('#ord_sh').onclick=function(){shareOrCopy('Commandez vos poulets en ligne'+(cfg.farm?' chez '+cfg.farm:'')+' :\n'+orderLink(),'Lien copié');};
+  $('#ord_cp').onclick=function(){toast(copyText(orderLink())?'Lien copié':'Copie impossible');};
+}
+
 /* Lecture seule quand l'essai est terminé : on bloque tout ce qui modifie les données. */
 app.addEventListener('click',function(e){
   if(!licOn()||canWrite()){return;}
@@ -1496,7 +1543,7 @@ function bindStat(){
 /* ---------- Centre : mises à jour + comptage des appareils ---------- */
 var CENTER={proj:'poulebox',key:'AIzaSyDaAkRRkGchPMrBw6oVKb4fhSFb2qptuWM'};
 function cenOn(){return !!(CENTER.proj&&CENTER.key);}
-var WEBVER='3.3 web';
+var WEBVER='3.4 web';
 function isWeb(){return !(window.AndroidBridge&&window.AndroidBridge.appInfo);}
 function appInfo(){if(isWeb()){return {name:WEBVER,code:999999};}try{var s=window.AndroidBridge&&window.AndroidBridge.appInfo&&window.AndroidBridge.appInfo();if(s){var a=String(s).split('|');return {name:a[0],code:parseInt(a[1],10)||0};}}catch(e){}return null;}
 function devId(){if(isWeb()){return normDev(getDev());}try{return String((window.AndroidBridge&&window.AndroidBridge.deviceId&&window.AndroidBridge.deviceId())||'').replace(/[^A-Z0-9]/g,'');}catch(e){return '';}}
