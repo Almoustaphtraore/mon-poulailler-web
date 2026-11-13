@@ -184,13 +184,15 @@ function vHome(){
   '<div class="grid3"><div class="kpi"><div class="sm">Dépenses</div><div class="v" style="color:var(--red)">'+fmt(s.depT)+'</div></div>'+
   '<div class="kpi"><div class="sm">Ventes</div><div class="v">'+fmt(s.venT)+'</div></div>'+
   '<div class="kpi"><div class="sm">'+(s.profit<0?'Perte':'Bénéfice')+'</div><div class="v" style="color:'+(s.profit<0?'var(--red)':'var(--green)')+'">'+fmt(Math.abs(s.profit))+'</div></div></div>'+
-  prixCard()+statCard()+
+  prixCard()+statCard()+climCard()+
   '<div class="card"><div class="h2">Alertes</div>'+(alerts.length?alerts.map(function(a){return '<div class="line"><span>⚠ '+a+'</span></div>';}).join(''):'<div class="sm">Aucune alerte pour le moment.</div>')+'</div>'+
   '<a class="btn" href="#/saisie">Saisie du jour</a>'+
   '<a class="btn red" href="#/depense/new">Ajouter une dépense</a>'+
   '<a class="btn alt" href="#/vente/new">Enregistrer une vente</a>'+
   '<a class="btn alt" href="#/bilan">Bilan et bénéfices</a>'+
   '<a class="btn alt" href="#/dettes">Dettes (par gérant)</a>'+
+  '<a class="btn alt" href="#/simulateur">Simulateur de vague</a>'+
+  '<a class="btn alt" href="#/climat">Température et météo</a>'+
   '<a class="btn alt" href="#/employes">Gérants et envoi automatique</a>'+
   '<a class="btn alt" href="#/securite">'+(pinOn()?'🔒 Code de verrouillage (activé)':'Code de verrouillage')+'</a>'+
   '<div class="card" style="margin-top:18px"><div class="h2">Sauvegarde</div><div class="sm" style="margin-bottom:10px">Vos données sont gardées sur ce téléphone. Faites une copie de temps en temps.</div>'+
@@ -819,7 +821,7 @@ app.addEventListener('click',function(e){
 });
 function tick(){
   if(document.visibilityState&&document.visibilityState!=='visible'){return;}
-  centerPing();updCheck().then(function(ch){if(ch&&!typing()&&(onWHome()||(cfg.role==='owner'&&(location.hash===''||location.hash==='#/accueil')))){route();}});
+  centerPing();licPull(false);updCheck().then(function(ch){if(ch&&!typing()&&(onWHome()||(cfg.role==='owner'&&(location.hash===''||location.hash==='#/accueil')))){route();}});
   if(cfg.role==='owner'){if(canAdv()){if(db.stat){var dn=dispoNow();if(db.stat.dispo!==dn){db.stat.dispo=dn;save();}}refreshOwner(true);publishState(true);publishDebts();}}
   else if(cfg.role==='worker'){workerFlush(true).then(function(n){if(n&&onWHome()&&!typing()){route();}});workerPull().then(function(ch){if(ch&&onWHome()&&!typing()){route();}});workerPullDebt().then(function(ch){if(ch&&onWHome()&&!typing()){route();}});}
 }
@@ -931,9 +933,10 @@ function vLicence(){
   '<div class="card"><div class="h2">Code de ce téléphone</div><div class="big" style="letter-spacing:2px;margin:6px 0">'+esc(dev)+'</div>'+
   '<div class="sm" style="margin-bottom:10px">Après votre paiement, envoyez ce code au vendeur. Il vous donnera une clé qui fonctionne uniquement sur ce téléphone.</div>'+
   '<button class="btn alt sm" type="button" id="lshare">Envoyer mon code</button>'+(CONTACT?'<div class="sm" style="margin-top:10px">'+esc(CONTACT)+'</div>':'')+'</div>'+
-  '<div class="card"><div class="h2">Entrer ma clé</div><div class="fld"><textarea class="in" id="f_key" rows="4" autocapitalize="none" placeholder="Collez ici la clé qui commence par PB2."></textarea></div>'+
+  aboBox()+'<div class="card"><div class="h2">Entrer ma clé</div><div class="fld"><textarea class="in" id="f_key" rows="4" autocapitalize="none" placeholder="Collez ici la clé qui commence par PB2."></textarea></div>'+
   '<button class="btn" type="button" id="lact">Activer</button></div></div>';
   return {html:html,theme:'t-green',init:function(){
+    aboBind();licPull(true);
     $('#lshare').onclick=function(){shareOrCopy('Code Mon Poulailler de mon téléphone : '+dev,'Code copié');};
     $('#lact').onclick=async function(){
       var r=await licActivate($('#f_key').value);toast(r.msg);
@@ -961,8 +964,8 @@ function vVendeur(){
     '<button class="btn" type="button" id="vgen">Créer la clé</button></div>'+
     '<div class="card"><div class="h2">Clé à envoyer</div><div class="fld"><textarea class="in" id="f_out" rows="5" readonly placeholder="La clé apparaîtra ici"></textarea></div>'+
     '<div class="row"><button class="btn alt sm" type="button" id="vshare">Envoyer</button><button class="btn alt sm" type="button" id="vcopy">Copier</button></div></div>'+
-    cenCard()+'<div style="margin-top:8px"><button class="chip sm" type="button" id="vforget">Retirer ma clé de vendeur de ce téléphone</button></div></div>',theme:'t-green',init:function(){
-    var last=0;cenBind();
+    venPayCard()+cenCard()+'<div style="margin-top:8px"><button class="chip sm" type="button" id="vforget">Retirer ma clé de vendeur de ce téléphone</button></div></div>',theme:'t-green',init:function(){
+    var last=0;cenBind();venPayBind(vk);
     $('#vgen').onclick=async function(){
       try{
         var days=parseInt(chipVal('dur'),10)||30;
@@ -975,6 +978,254 @@ function vVendeur(){
     $('#vforget').onclick=function(){if(confirm('Retirer votre clé de vendeur de ce téléphone ? Gardez-en une copie ailleurs.')){try{localStorage.removeItem(VKEY);}catch(e){}route();}};
   }};
 }
+
+/* ---------- Climat selon l'âge, simulateur, abonnement par paiement mobile, parrainage ---------- */
+function idealT(d){
+  if(d<=7){return {lo:32,hi:34};}
+  if(d<=14){return {lo:29,hi:31};}
+  if(d<=21){return {lo:26,hi:28};}
+  if(d<=28){return {lo:23,hi:25};}
+  return {lo:21,hi:23};
+}
+function climAdvice(d,t){
+  var i=idealT(d);
+  if(t>i.hi+4){return {c:'red',m:`Trop chaud (idéal ${i.lo}-${i.hi}°C). Ouvrez les côtés, ventilez, donnez de l'eau fraîche en continu, nourrissez tôt le matin et tard le soir.`};}
+  if(t>i.hi){return {c:'amber',m:`Un peu chaud (idéal ${i.lo}-${i.hi}°C). Plus d'aération, eau fraîche, évitez de manipuler les poulets en journée.`};}
+  if(t<i.lo-4){return {c:'red',m:`Trop froid (idéal ${i.lo}-${i.hi}°C). Les poussins se serrent et risquent de mourir : chauffage, lampes, rideaux, litière sèche.`};}
+  if(t<i.lo){return {c:'amber',m:`Un peu frais (idéal ${i.lo}-${i.hi}°C). Ajoutez de la chaleur, fermez les courants d'air, surveillez si les poulets se serrent.`};}
+  return {c:'green',m:`Température idéale pour ce jour (${i.lo}-${i.hi}°C). Continuez ainsi.`};
+}
+async function wxFetch(city){
+  var g=await fetchT('https://geocoding-api.open-meteo.com/v1/search?count=1&language=fr&name='+encodeURIComponent(city),{},12000);
+  var gj=await g.json();if(!gj.results||!gj.results[0]){throw new Error('Ville introuvable');}
+  var p=gj.results[0];
+  var r=await fetchT('https://api.open-meteo.com/v1/forecast?latitude='+p.latitude+'&longitude='+p.longitude+'&current=temperature_2m&daily=temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=1',{},12000);
+  var j=await r.json();
+  return {city:p.name,now:j.current.temperature_2m,max:j.daily.temperature_2m_max[0],min:j.daily.temperature_2m_min[0],ts:Date.now()};
+}
+function climCard(){
+  var b=curBande();if(!b||b.fin){return '';}
+  var d=dayN(b),i=idealT(d),w=cfg.wx,h='';
+  if(w){var a=climAdvice(d,w.max);h=`<div class="sm" style="margin-top:6px">${esc(w.city)} : maintenant ${Math.round(w.now)}°C · max ${Math.round(w.max)}°C · min ${Math.round(w.min)}°C</div>`;}
+  return `<a class="box" href="#/climat" style="display:block;text-decoration:none;margin-bottom:14px"><b>🌡 Température idéale : ${i.lo}-${i.hi}°C</b><div class="sm">Jour ${d} de la vague. Touchez pour voir la météo et les conseils.</div>${h}</a>`;
+}
+function vClimat(){
+  var b=curBande(),d=dayN(b),i=idealT(d);
+  var rows=[[7,'1 à 7','32-34'],[14,'8 à 14','29-31'],[21,'15 à 21','26-28'],[28,'22 à 28','23-25'],[99,'29 et plus','21-23']];
+  var tab=rows.map(function(r){var on=(d<=r[0]&&(r[0]===7||d>rows[rows.indexOf(r)-1][0]));return `<div class="line"${on?' style="font-weight:700;color:var(--green)"':''}><span>Jours ${r[1]}</span><span>${r[2]} °C</span></div>`;}).join('');
+  var html=`<div class="screen"><div class="ttl"><a class="back" href="#/accueil" aria-label="Retour">‹</a><h1>Température</h1></div>
+  <div class="card"><div class="h2">Aujourd'hui : jour ${d}</div><div class="big">${i.lo}-${i.hi} <small>°C idéal</small></div></div>
+  <div class="card"><div class="h2">Météo de ma ville</div><div class="fld"><input class="in" id="wx_c" type="text" placeholder="Ex. : Bamako" value="${esc((cfg.wx&&cfg.wx.city)||cfg.city||'')}"></div>
+  <button class="btn sm" type="button" id="wx_b">Voir la météo</button><div id="wx_r" class="sm" style="margin-top:10px">${cfg.wx?'':'Entrez votre ville (internet nécessaire).'}</div></div>
+  <div class="card"><div class="h2">Température dans mon poulailler</div><div class="fld"><input class="in" id="wx_t" type="text" inputmode="decimal" placeholder="Lue sur le thermomètre, ex. 31"></div><div id="wx_a" class="sm"></div></div>
+  <div class="card"><div class="h2">Repères selon l'âge</div>${tab}</div></div>`;
+  return {html:html,theme:'t-green',init:function(){
+    function show(){
+      var w=cfg.wx,el=$('#wx_r');if(!w){return;}
+      var a=climAdvice(d,w.max);
+      el.innerHTML=`${esc(w.city)} : maintenant <b>${Math.round(w.now)}°C</b> · max <b>${Math.round(w.max)}°C</b> · min <b>${Math.round(w.min)}°C</b><div class="box ${a.c==='red'?'redbox':''}" style="margin-top:8px">Journée chaude : ${esc(climAdvice(d,w.max).m)}</div><div class="box" style="margin-top:8px">Nuit : ${esc(climAdvice(d,w.min).m)}</div><div class="sm" style="margin-top:6px">La météo donne l'air extérieur. Dans un poulailler fermé, il fait plus chaud : mesurez aussi à l'intérieur.</div>`;
+    }
+    show();
+    $('#wx_b').onclick=async function(){
+      var c=$('#wx_c').value.trim();if(!c){toast('Entrez une ville');return;}
+      $('#wx_r').textContent='Chargement…';
+      try{cfg.wx=await wxFetch(c);cfg.city=c;saveCfg();show();}catch(e){$('#wx_r').textContent=errMsg(e);}
+    };
+    $('#wx_t').oninput=function(){
+      var t=num(this.value),el=$('#wx_a');
+      if(!t){el.textContent='';return;}
+      var a=climAdvice(d,t);el.innerHTML=`<div class="box ${a.c==='red'?'redbox':''}" style="margin-top:8px"><b>${t}°C</b> : ${esc(a.m)}</div>`;
+    };
+  }};
+}
+
+/* Simulateur de vagues */
+function simCalc(o){
+  var vivants=Math.round(o.nb*(1-o.mort/100)),
+      kgViande=vivants*o.poids,
+      kgAl=kgViande*o.ic,
+      cAl=kgAl*o.pal,
+      cPou=o.nb*o.pp,
+      cTot=cPou+cAl+o.autres,
+      rev=o.mode==='kg'?kgViande*o.pv:vivants*o.pv,
+      ben=rev-cTot;
+  return {vivants:vivants,kgViande:kgViande,kgAl:kgAl,sacs:kgAl/50,cAl:cAl,cPou:cPou,cTot:cTot,rev:rev,ben:ben,cPar:vivants?cTot/vivants:0,seuil:vivants?cTot/vivants:0,marge:rev?ben/rev*100:0};
+}
+function vSim(){
+  var s=cfg.sim||{nb:500,pp:600,mort:5,jours:42,poids:2.2,ic:1.75,pal:350,autres:25000,pv:3000,mode:'tete'};
+  function f(id,l,v,ph){return `<div class="fld"><label class="l" for="s_${id}">${l}</label><input class="in" id="s_${id}" type="text" inputmode="decimal" value="${esc(v)}"${ph?` placeholder="${ph}"`:''}></div>`;}
+  var html=`<div class="screen"><div class="ttl"><a class="back" href="#/accueil" aria-label="Retour">‹</a><h1>Simulateur de vague</h1></div>
+  <div class="sm" style="margin-bottom:10px">Calculez le bénéfice avant de commander vos poussins. Modifiez les chiffres : le résultat se met à jour.</div>
+  <div class="card">${f('nb','Nombre de poussins',s.nb)}${f('pp','Prix d\'un poussin (FCFA)',s.pp)}${f('mort','Mortalité prévue (%)',s.mort)}${f('jours','Durée d\'élevage (jours)',s.jours)}${f('poids','Poids moyen à la vente (kg)',s.poids)}${f('ic','Aliment par kg de poids gagné (indice, 1,6 à 2)',s.ic)}${f('pal','Prix du kg d\'aliment (FCFA)',s.pal)}${f('autres','Autres frais : médicaments, chauffage, main-d\'œuvre… (FCFA)',s.autres)}
+  <div class="fld"><div class="l">Vente</div>${chips('smode',['Par poulet','Au kilo'],s.mode==='kg'?'Au kilo':'Par poulet')}</div>${f('pv','Prix de vente (FCFA par poulet ou par kg)',s.pv)}</div>
+  <div class="card" id="s_res"></div>
+  <button class="btn alt" type="button" id="s_sh">Partager ce calcul</button></div>`;
+  return {html:html,theme:'t-green',init:function(){
+    var last=null;
+    function read(){return {nb:num($('#s_nb').value),pp:num($('#s_pp').value),mort:Math.min(100,num($('#s_mort').value)),jours:num($('#s_jours').value),poids:num($('#s_poids').value),ic:num($('#s_ic').value),pal:num($('#s_pal').value),autres:num($('#s_autres').value),pv:num($('#s_pv').value),mode:chipVal('smode')==='Au kilo'?'kg':'tete'};}
+    function calc(){
+      var o=read();cfg.sim=o;saveCfg();var r=simCalc(o);last={o:o,r:r};
+      var good=r.ben>=0;
+      $('#s_res').innerHTML=`<div class="h2">Résultat</div><div class="big" style="color:${good?'var(--green)':'var(--red)'}">${good?'Bénéfice':'Perte'} : ${fmt(Math.abs(r.ben))} <small>FCFA</small></div>
+      <div class="line"><span>Poulets vendus</span><b>${r.vivants}</b></div><div class="line"><span>Viande produite</span><b>${fmt(r.kgViande)} kg</b></div>
+      <div class="line"><span>Aliment nécessaire</span><b>${fmt(r.kgAl)} kg (≈ ${(Math.round(r.sacs*10)/10).toString().replace('.',',')} sacs de 50 kg)</b></div>
+      <div class="line"><span>Poussins</span><b>${fmt(r.cPou)}</b></div><div class="line"><span>Aliment</span><b>${fmt(r.cAl)}</b></div><div class="line"><span>Autres frais</span><b>${fmt(o.autres)}</b></div>
+      <div class="line"><span>Total des dépenses</span><b>${fmt(r.cTot)}</b></div><div class="line"><span>Ventes attendues</span><b>${fmt(r.rev)}</b></div>
+      <div class="line"><span>Coût par poulet vendu</span><b>${fmt(r.cPar)}</b></div>
+      <div class="sm" style="margin-top:8px">Pour ne pas perdre, vendez chaque poulet au moins <b>${fmt(r.seuil)} FCFA</b>.${o.jours>60?' Au-delà de 60 jours, les poulets coûtent plus cher à nourrir.':''}</div>`;
+    }
+    app.querySelectorAll('input.in').forEach(function(x){x.oninput=calc;});
+    hooks.chip=function(g){if(g==='smode'){calc();}};
+    $('#s_sh').onclick=function(){if(!last){return;}var o=last.o,r=last.r;shareOrCopy(`Simulation Mon Poulailler\n${o.nb} poussins, ${o.mort}% de mortalité, ${o.jours} jours\nDépenses : ${fmt(r.cTot)} FCFA\nVentes : ${fmt(r.rev)} FCFA\n${r.ben>=0?'Bénéfice':'Perte'} : ${fmt(Math.abs(r.ben))} FCFA\nSeuil de rentabilité : ${fmt(r.seuil)} FCFA par poulet`,'Calcul copié');};
+    calc();
+  }};
+}
+
+/* Abonnement par paiement mobile (Orange Money / Wave) + parrainage */
+var PRICE0={p30:1000,p90:3000,p365:10000,om:'77333377',wave:'77333377',msg:''};
+function myCode(){return normDev(getDev());}
+async function priceGet(){
+  if(!cenOn()){return cfg.price||PRICE0;}
+  try{
+    var r=await fetchT(fsBase(CENTER.proj)+'/app/pricing?key='+encodeURIComponent(CENTER.key),{},10000);
+    if(r.ok){var j=await r.json(),o=fromFs(j.fields);cfg.price={p30:+o.p30||PRICE0.p30,p90:+o.p90||PRICE0.p90,p365:+o.p365||PRICE0.p365,om:o.om||PRICE0.om,wave:o.wave||PRICE0.wave,msg:o.msg||''};saveCfg();}
+  }catch(e){}
+  return cfg.price||PRICE0;
+}
+async function reqSend(o){
+  var id=myCode();o.dev=id;o.ts=Date.now();o.st='new';
+  var qs=Object.keys(o).map(function(k){return 'updateMask.fieldPaths='+k;}).join('&');
+  var r=await fetchT(fsBase(CENTER.proj)+'/requests/'+id+'?'+qs+'&key='+encodeURIComponent(CENTER.key),{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(toFs(o))},15000);
+  if(!r.ok){throw new Error('Envoi impossible ('+r.status+')');}
+}
+/* Récupère les clés envoyées par le vendeur et les active toutes seules */
+async function licPull(force){
+  if(!licOn()||!cenOn()){return 0;}
+  var n=Date.now();if(!force&&cfg.kpull&&n-cfg.kpull<5*60e3){return 0;}
+  cfg.kpull=n;saveCfg();
+  try{
+    var r=await fetchT(fsBase(CENTER.proj)+'/keys/'+myCode()+'?key='+encodeURIComponent(CENTER.key),{},10000);
+    if(!r.ok){return 0;}
+    var o=fromFs((await r.json()).fields),list=String(o.list||'').split(/\s+/).filter(Boolean),ok=0;
+    for(var i=0;i<list.length;i++){var x=await licActivate(list[i]);if(x.ok){ok++;}}
+    if(ok){cfg.lreq=null;saveCfg();toast('Abonnement activé ✓');route();}
+    return ok;
+  }catch(e){return 0;}
+}
+function parrainTxt(){return `Je gère mes poulets avec l'application Mon Poulailler (dépenses, ventes, mortalité, gérants). Essai gratuit 30 jours. Quand vous vous abonnez, entrez mon code de parrain : ${myCode()}\nContact : +223 77 33 33 77`;}
+function vAbo(){
+  var dur=cfg.lreq&&cfg.lreq.days?cfg.lreq.days:365;
+  var st=licState();
+  var html=`<div class="screen"><div class="ttl"><a class="back" href="#/licence" aria-label="Retour">‹</a><h1>S'abonner</h1></div>
+  <div class="card" id="ab_pr"><div class="sm">Chargement des prix…</div></div></div>`;
+  return {html:html,theme:'t-green',init:async function(){
+    var P=await priceGet(),days=dur,meth='om';
+    var el=$('#ab_pr');if(!el){return;}
+    var par=(cfg.lreq&&cfg.lreq.par)||'';
+    el.innerHTML=`<div class="h2">1. Choisissez la durée</div>${chips('abd',['30 jours · '+fmt(P.p30)+' F','3 mois · '+fmt(P.p90)+' F','1 an · '+fmt(P.p365)+' F'],days===30?'30 jours · '+fmt(P.p30)+' F':days===90?'3 mois · '+fmt(P.p90)+' F':'1 an · '+fmt(P.p365)+' F')}
+    <div class="h2" style="margin-top:14px">2. Payez avec</div>${chips('abm',['Orange Money','Wave'],'Orange Money')}
+    <div class="box" id="ab_how" style="margin:10px 0"></div>
+    <div class="h2">3. Confirmez</div>
+    <div class="fld"><label class="l" for="ab_n">Votre nom</label><input class="in" id="ab_n" type="text" value="${esc((cfg.lreq&&cfg.lreq.nom)||'')}"></div>
+    <div class="fld"><label class="l" for="ab_t">Votre numéro (celui qui a payé)</label><input class="in" id="ab_t" type="text" inputmode="tel" value="${esc((cfg.lreq&&cfg.lreq.tel)||'')}"></div>
+    <div class="fld"><label class="l" for="ab_r">Référence du paiement (facultatif)</label><input class="in" id="ab_r" type="text"></div>
+    <div class="fld"><label class="l" for="ab_p">Code de parrain (facultatif)</label><input class="in" id="ab_p" type="text" autocapitalize="characters" placeholder="Code de la personne qui vous a conseillé" value="${esc(par)}"></div>
+    <button class="btn" type="button" id="ab_go">J'ai payé</button>
+    <div class="sm" style="margin-top:10px">Dès que le paiement est vérifié, votre abonnement s'active tout seul sur ce téléphone (ouvrez l'application avec internet).</div>`;
+    function price(){return days===30?P.p30:days===90?P.p90:P.p365;}
+    function how(){
+      var num=meth==='om'?P.om:P.wave,nm=meth==='om'?'Orange Money':'Wave';
+      $('#ab_how').innerHTML=`Envoyez <b>${fmt(price())} FCFA</b> par <b>${nm}</b> au numéro :<div class="big" style="letter-spacing:1px;margin:6px 0">${esc(num)}</div>${P.msg?`<div class="sm">${esc(P.msg)}</div>`:''}<button class="btn alt sm" type="button" id="ab_cp">Copier le numéro</button>`;
+      $('#ab_cp').onclick=function(){toast(copyText(num)?'Numéro copié':'Copie impossible');};
+    }
+    how();
+    hooks.chip=function(g,v){
+      if(g==='abd'){days=/^30/.test(v)?30:/^3 /.test(v)?90:365;}
+      if(g==='abm'){meth=v==='Wave'?'wave':'om';}
+      how();
+    };
+    $('#ab_go').onclick=async function(){
+      var nom=$('#ab_n').value.trim(),tel=$('#ab_t').value.trim();
+      if(!nom||!tel){toast('Entrez votre nom et votre numéro');return;}
+      var pa=normDev($('#ab_p').value);if(pa&&pa===myCode()){toast('Vous ne pouvez pas vous parrainer vous-même');return;}
+      var o={nom:nom,tel:tel,days:days,amt:price(),meth:meth==='om'?'Orange Money':'Wave',ref:$('#ab_r').value.trim(),par:pa};
+      try{
+        await reqSend(o);
+        cfg.lreq={nom:nom,tel:tel,days:days,par:pa,ts:Date.now()};saveCfg();
+        toast('Demande envoyée. Activation après vérification.');location.hash='#/licence';route();
+      }catch(e){toast(errMsg(e));}
+    };
+  }};
+}
+function aboBox(){
+  var r=cfg.lreq;
+  var wait=r?`<div class="box yelbox" style="margin-bottom:10px">⏳ Demande envoyée (${r.days} jours). Elle s'activera toute seule après vérification du paiement.<button class="btn alt sm" type="button" id="ab_chk" style="margin-top:8px">Vérifier maintenant</button></div>`:'';
+  return `<div class="card"><div class="h2">Payer par Orange Money ou Wave</div>${wait}<div class="sm" style="margin-bottom:10px">Payez depuis votre téléphone, puis votre abonnement s'active sans clé à copier.</div><a class="btn yel" href="#/abo">S'abonner maintenant</a></div>
+  <div class="card"><div class="h2">Parrainage</div><div class="sm" style="margin-bottom:6px">Votre code de parrain : <b>${esc(myCode())}</b></div><div class="sm" style="margin-bottom:10px">Quand quelqu'un s'abonne avec votre code, vous gagnez <b>30 jours gratuits</b>, ajoutés automatiquement.</div><button class="btn alt sm" type="button" id="par_sh">Inviter un éleveur</button></div>`;
+}
+function aboBind(){
+  var b=$('#ab_chk');if(b){b.onclick=async function(){var n=await licPull(true);toast(n?'Abonnement activé ✓':'Pas encore validé');};}
+  var p=$('#par_sh');if(p){p.onclick=function(){shareOrCopy(parrainTxt(),'Message copié');};}
+}
+/* Vendeur : prix, demandes de paiement, validation */
+async function reqList(){
+  var tk=await cenTok(),r=await fetchT(fsBase(CENTER.proj)+'/requests?pageSize=100&key='+encodeURIComponent(CENTER.key),{headers:{'Authorization':'Bearer '+tk}},20000);
+  if(!r.ok){throw new Error(r.status===403?'Règles Firebase à mettre à jour':'Erreur ('+r.status+')');}
+  var j=await r.json();return (j.documents||[]).map(function(d){return fromFs(d.fields);}).filter(function(x){return x.st!=='done';}).sort(function(a,b){return a.ts-b.ts;});
+}
+async function keyPush(dev,key,tk){
+  var u=fsBase(CENTER.proj)+'/keys/'+dev+'?key='+encodeURIComponent(CENTER.key),cur='';
+  var r=await fetchT(u,{headers:{'Authorization':'Bearer '+tk}},12000);
+  if(r.ok){cur=String(fromFs((await r.json()).fields).list||'');}
+  var arr=cur.split(/\s+/).filter(Boolean);arr.push(key);arr=arr.slice(-10);
+  var w=await fetchT(u+'&updateMask.fieldPaths=list&updateMask.fieldPaths=ts',{method:'PATCH',headers:{'Content-Type':'application/json','Authorization':'Bearer '+tk},body:JSON.stringify(toFs({list:arr.join(' '),ts:Date.now()}))},15000);
+  if(!w.ok){throw new Error('Écriture refusée ('+w.status+')');}
+}
+async function reqApprove(q,vk){
+  var tk=await cenTok();
+  var key=await venGen(vk,q.dev,q.days);
+  await keyPush(normDev(q.dev),key,tk);
+  if(q.par&&normDev(q.par).length===8){var k2=await venGen(vk,q.par,30);await keyPush(normDev(q.par),k2,tk);}
+  var qs='updateMask.fieldPaths=st';
+  var r=await fetchT(fsBase(CENTER.proj)+'/requests/'+normDev(q.dev)+'?'+qs+'&key='+encodeURIComponent(CENTER.key),{method:'PATCH',headers:{'Content-Type':'application/json','Authorization':'Bearer '+tk},body:JSON.stringify(toFs({st:'done'}))});
+  if(!r.ok){throw new Error('Mise à jour refusée ('+r.status+')');}
+}
+async function priceSave(o){
+  var tk=await cenTok(),qs=Object.keys(o).map(function(k){return 'updateMask.fieldPaths='+k;}).join('&');
+  var r=await fetchT(fsBase(CENTER.proj)+'/app/pricing?'+qs+'&key='+encodeURIComponent(CENTER.key),{method:'PATCH',headers:{'Content-Type':'application/json','Authorization':'Bearer '+tk},body:JSON.stringify(toFs(o))});
+  if(!r.ok){throw new Error('Enregistrement refusé ('+r.status+')');}
+}
+function venPayCard(){
+  var P=cfg.price||PRICE0;
+  return `<div class="card"><div class="h2">Demandes de paiement</div><div id="rq_l" class="sm" style="margin-bottom:10px">Touchez Actualiser.</div><button class="btn sm" type="button" id="rq_b">Actualiser</button></div>
+  <div class="card"><div class="h2">Prix et numéros de paiement</div>
+  <div class="row fld"><div><label class="l" for="pr_30">30 jours</label><input class="in" id="pr_30" type="text" inputmode="numeric" value="${P.p30}"></div><div><label class="l" for="pr_90">3 mois</label><input class="in" id="pr_90" type="text" inputmode="numeric" value="${P.p90}"></div></div>
+  <div class="fld"><label class="l" for="pr_365">1 an</label><input class="in" id="pr_365" type="text" inputmode="numeric" value="${P.p365}"></div>
+  <div class="row fld"><div><label class="l" for="pr_om">N° Orange Money</label><input class="in" id="pr_om" type="text" inputmode="tel" value="${esc(P.om)}"></div><div><label class="l" for="pr_wv">N° Wave</label><input class="in" id="pr_wv" type="text" inputmode="tel" value="${esc(P.wave)}"></div></div>
+  <div class="fld"><label class="l" for="pr_m">Message (facultatif)</label><input class="in" id="pr_m" type="text" maxlength="100" value="${esc(P.msg)}"></div>
+  <button class="btn yel sm" type="button" id="pr_s">Publier les prix</button></div>`;
+}
+function venPayBind(vk){
+  var b=$('#rq_b');if(!b){return;}
+  b.onclick=async function(){
+    var el=$('#rq_l');el.textContent='Chargement…';
+    try{
+      var l=await reqList();
+      if(!l.length){el.textContent='Aucune demande en attente.';return;}
+      el.innerHTML=l.map(function(q,i){return `<div class="box" style="margin-bottom:8px"><b>${esc(q.nom)}</b> · ${esc(q.tel)}<div class="sm">${q.days} jours · ${fmt(q.amt)} F · ${esc(q.meth)}${q.ref?' · réf '+esc(q.ref):''}</div><div class="sm">Téléphone : ${esc(q.dev)}${q.par?' · parrain : '+esc(q.par):''}</div><button class="btn sm" type="button" data-rq="${i}" style="margin-top:6px">Paiement reçu : activer</button></div>`;}).join('');
+      el.querySelectorAll('[data-rq]').forEach(function(x){x.onclick=async function(){
+        var q=l[+x.dataset.rq];x.disabled=true;
+        try{await reqApprove(q,vk);toast('Activé pour '+q.nom);x.textContent='Activé ✓';}catch(e){x.disabled=false;toast(errMsg(e));}
+      };});
+    }catch(e){el.textContent=errMsg(e);}
+  };
+  $('#pr_s').onclick=async function(){
+    var o={p30:parseInt($('#pr_30').value,10)||0,p90:parseInt($('#pr_90').value,10)||0,p365:parseInt($('#pr_365').value,10)||0,om:$('#pr_om').value.trim(),wave:$('#pr_wv').value.trim(),msg:$('#pr_m').value.trim()};
+    if(!o.p30||!o.p90||!o.p365){toast('Entrez les trois prix');return;}
+    try{await priceSave(o);cfg.price={p30:o.p30,p90:o.p90,p365:o.p365,om:o.om,wave:o.wave,msg:o.msg};saveCfg();toast('Prix publiés');}catch(e){toast(errMsg(e));}
+  };
+}
+
 /* Lecture seule quand l'essai est terminé : on bloque tout ce qui modifie les données. */
 app.addEventListener('click',function(e){
   if(!licOn()||canWrite()){return;}
@@ -1086,7 +1337,7 @@ function route(){
   if(({employes:1,valider:1,activite:1,commandes:1})[r]&&st.mode!=='paid'){render(vLock('adv'),r);return;}
   if(({depense:1,saisie:1,vente:1,bande:1})[r]&&st.mode==='expired'){render(vLock('ro'),r);return;}
   if(!db.bandes.length&&r!=='bande'){location.replace('#/bande/new');return;}
-  var views={accueil:vHome,depenses:vDep,depense:function(){return vDepForm(arg);},stock:vStock,saisie:vSaisie,ventes:vVentes,vente:function(){return vVenteForm(arg);},bandes:vBandes,bande:vBandeForm,valider:vValider,employes:vEmployes,commandes:vCommandes,activite:vActivite,bilan:function(){return vBilan(arg);},dettes:vDettes};
+  var views={accueil:vHome,depenses:vDep,depense:function(){return vDepForm(arg);},stock:vStock,saisie:vSaisie,ventes:vVentes,vente:function(){return vVenteForm(arg);},bandes:vBandes,bande:vBandeForm,valider:vValider,employes:vEmployes,commandes:vCommandes,activite:vActivite,bilan:function(){return vBilan(arg);},dettes:vDettes,climat:vClimat,simulateur:vSim,abo:vAbo};
   render((views[r]||vHome)(),r);
 }
 app.addEventListener('click',function(e){
@@ -1245,7 +1496,7 @@ function bindStat(){
 /* ---------- Centre : mises à jour + comptage des appareils ---------- */
 var CENTER={proj:'poulebox',key:'AIzaSyDaAkRRkGchPMrBw6oVKb4fhSFb2qptuWM'};
 function cenOn(){return !!(CENTER.proj&&CENTER.key);}
-var WEBVER='3.2 web';
+var WEBVER='3.3 web';
 function isWeb(){return !(window.AndroidBridge&&window.AndroidBridge.appInfo);}
 function appInfo(){if(isWeb()){return {name:WEBVER,code:999999};}try{var s=window.AndroidBridge&&window.AndroidBridge.appInfo&&window.AndroidBridge.appInfo();if(s){var a=String(s).split('|');return {name:a[0],code:parseInt(a[1],10)||0};}}catch(e){}return null;}
 function devId(){if(isWeb()){return normDev(getDev());}try{return String((window.AndroidBridge&&window.AndroidBridge.deviceId&&window.AndroidBridge.deviceId())||'').replace(/[^A-Z0-9]/g,'');}catch(e){return '';}}
