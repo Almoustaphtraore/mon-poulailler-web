@@ -113,7 +113,7 @@ var NAV=[['accueil','Accueil','M4 11l8-7 8 7v9a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0
 ['ventes','Ventes','M4 17l5-5 4 4 7-8 M15 8h5v5'],
 ['valider','À valider','M22 12h-6l-2 3h-4l-2-3H2 M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z'],
 ['bandes','Vagues','M7 4h10a3 3 0 0 1 3 3v10a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3z M8 9h8 M8 13h8 M8 17h5']];
-var ACTIVE={accueil:'accueil',depenses:'depenses',depense:'depenses',stock:'stock',saisie:'stock',ventes:'ventes',vente:'ventes',bandes:'bandes',bande:'bandes',valider:'valider',employes:'accueil',commandes:'ventes',activite:'accueil',bilan:'accueil',securite:'accueil',dettes:'accueil'};
+var ACTIVE={accueil:'accueil',depenses:'depenses',depense:'depenses',stock:'stock',saisie:'stock',ventes:'ventes',vente:'ventes',bandes:'bandes',bande:'bandes',valider:'valider',employes:'accueil',commandes:'ventes',activite:'accueil',bilan:'accueil',securite:'accueil',dettes:'accueil',oeufs:'accueil'};
 
 var app=document.getElementById('app');
 var db=load();
@@ -149,9 +149,53 @@ function curBande(){
 }
 function stats(b){
   var dep=db.depenses.filter(function(x){return x.b===b.id;}),ve=db.ventes.filter(function(x){return x.b===b.id;}),mo=db.morts.filter(function(x){return x.b===b.id;});
-  var dead=sum(mo,'n'),sold=sum(ve,'qty'),depT=sum(dep,'total'),venT=sum(ve,'total');
-  return {dep:dep,ve:ve,mo:mo,dead:dead,sold:sold,alive:Math.max(0,b.nb-dead-sold),depT:depT,venT:venT,
-    profit:venT-depT,rate:b.nb?dead/b.nb*100:0,costPlaced:b.nb?depT/b.nb:0,costSold:sold?depT/sold:0,avgPrice:sold?venT/sold:0};
+  var vp=ve.filter(function(x){return x.prod!=='oeuf';}),vo=ve.filter(function(x){return x.prod==='oeuf';}),oe=(db.oeufs||[]).filter(function(x){return x.b===b.id;});
+  var dead=sum(mo,'n'),sold=sum(vp,'qty'),depT=sum(dep,'total'),venT=sum(ve,'total'),venP=sum(vp,'total');
+  var rec=sum(oe,'n'),cas=sum(oe,'casses'),pl=sum(vo,'qty');
+  return {dep:dep,ve:ve,mo:mo,vp:vp,vo:vo,oe:oe,rec:rec,cas:cas,pl:pl,oStock:Math.max(0,rec-cas-pl*30),venP:venP,venO:sum(vo,'total'),dead:dead,sold:sold,alive:Math.max(0,b.nb-dead-sold),depT:depT,venT:venT,
+    profit:venT-depT,rate:b.nb?dead/b.nb*100:0,costPlaced:b.nb?depT/b.nb:0,costSold:sold?depT/sold:0,avgPrice:sold?venP/sold:0};
+}
+function isP(b){return !!b&&b.type==='ponte';}
+function typesNow(){
+  var a=db.bandes.filter(function(x){return !x.fin;});if(!a.length){a=db.bandes;}
+  var p=a.some(isP),c=a.some(function(x){return !isP(x);});
+  return p&&c?'both':(p?'ponte':'chair');
+}
+function pBandDef(){
+  var a=db.bandes.filter(isP),b=curBande();
+  if(isP(b)){return b;}
+  return a.filter(function(x){return !x.fin;})[0]||a[a.length-1]||null;
+}
+function wT(){var t=cfg.state&&cfg.state.types;return (t==='ponte'||t==='both')?t:'chair';}
+function plat(n){n=Math.max(0,Math.round(n||0));var p=Math.floor(n/30),r=n%30;return p+' plateau'+(p>1?'x':'')+(r?' + '+r+' œuf'+(r>1?'s':''):'');}
+function ponteInfo(b,s){
+  var oe=s.oe.slice().sort(function(a,c){return c.date.localeCompare(a.date)||(c.ts||0)-(a.ts||0);});
+  var hens=Math.max(1,s.alive),last=oe[0]||null,l7=oe.slice(0,7),prev=oe.slice(1,8);
+  var avg7=l7.length?sum(l7,'n')/l7.length:0,prevAvg=prev.length?sum(prev,'n')/prev.length:0;
+  var prodE=Math.max(0,s.rec-s.cas),net=Math.max(0,s.depT-s.venP);
+  var today=oe.filter(function(x){return x.date===todayISO();})[0]||null;
+  return {list:oe,last:last,today:today,rateLast:last?last.n/hens*100:0,rate7:avg7/hens*100,
+    drop:!!(prev.length>=3&&last&&prevAvg>0&&last.n<prevAvg*0.8),prevAvg:prevAvg,
+    costPl:prodE>=30?net/(prodE/30):0,casPct:s.rec?s.cas/s.rec*100:0};
+}
+function ponteCard(b,s){
+  var pi=ponteInfo(b,s);
+  return '<a class="card" href="#/oeufs" style="display:block;text-decoration:none;color:inherit"><div class="h2">🥚 Ponte</div><div class="row"><div><div class="sm">Aujourd\'hui</div><b>'+(pi.today?fmt(pi.today.n)+' œufs':'À saisir')+'</b></div><div><div class="sm">Taux de ponte</div><b>'+pct(pi.today?pi.today.n/Math.max(1,s.alive)*100:pi.rate7)+'</b></div><div><div class="sm">Stock d\'œufs</div><b>'+Math.floor(s.oStock/30)+' pl.</b></div></div></a>';
+}
+function ponteBilan(b,d,ln){
+  var s=d.s,pi=ponteInfo(b,s),sep='<div style="border-top:1px solid var(--pB);margin:8px 0"></div>';
+  return '<div class="card"><div class="h2">Pondeuses et ponte</div>'+ln('Pondeuses mises en place',b.nb)+ln('Mortes','<span class="mort">'+s.dead+' ('+pct(s.rate)+')</span>')+ln('Réformées (vendues)',s.sold)+ln('Restantes',s.alive)+sep+
+  ln('Œufs ramassés',fmt(s.rec))+ln('Œufs cassés',fmt(s.cas)+' ('+pct(pi.casPct)+')')+ln('Œufs vendus',s.pl+' plateaux')+ln('Stock d\'œufs',plat(s.oStock))+ln('Taux de ponte (7 derniers jours)',pct(pi.rate7))+sep+
+  ln('Ventes d\'œufs',fmt(s.venO)+' FCFA')+ln('Ventes de poules (réformes)',fmt(s.venP)+' FCFA')+
+  '<div class="box" style="margin-top:10px"><b>Prix minimum du plateau : '+(pi.costPl>0?fmt(pi.costPl)+' FCFA':'—')+'</b><div class="sm" style="color:var(--pDk)">pour couvrir toutes les dépenses (après vente des poules de réforme).</div></div></div>';
+}
+function ponteTxt(b,d,L){
+  var s=d.s,pi=ponteInfo(b,s);
+  L.push('Pondeuses : '+b.nb+' mises en place · '+s.dead+' mortes ('+pct(s.rate)+') · '+s.sold+' réformées · '+s.alive+' restantes');
+  L.push('Œufs ramassés : '+fmt(s.rec)+' · cassés : '+fmt(s.cas)+' ('+pct(pi.casPct)+') · vendus : '+s.pl+' plateaux · stock : '+plat(s.oStock));
+  L.push('Taux de ponte (7 derniers jours) : '+pct(pi.rate7));
+  L.push('Ventes d\'œufs : '+fmt(s.venO)+' FCFA · ventes de poules : '+fmt(s.venP)+' FCFA');
+  if(pi.costPl>0){L.push('Prix minimum du plateau pour couvrir les dépenses : '+fmt(pi.costPl)+' FCFA');}
 }
 function chips(g,opts,sel,cls,extra){
   return '<div class="chips '+(cls||'')+'">'+opts.map(function(o){
@@ -160,7 +204,7 @@ function chips(g,opts,sel,cls,extra){
 function chipVal(g){var c=app.querySelector('.chip.on[data-g="'+g+'"]');return c?c.dataset.v:'';}
 function bsel(){
   return '<select class="in sel" id="bsel" aria-label="Vague">'+db.bandes.map(function(b){
-    return '<option value="'+b.id+'"'+(b.id===db.cur?' selected':'')+'>'+esc(b.nom)+' · jour '+dayN(b)+(b.fin?' (terminée)':'')+'</option>';}).join('')+'</select>';
+    return '<option value="'+b.id+'"'+(b.id===db.cur?' selected':'')+'>'+(isP(b)?'🥚 ':'')+esc(b.nom)+' · jour '+dayN(b)+(b.fin?' (terminée)':'')+'</option>';}).join('')+'</select>';
 }
 function bindBsel(){var s=$('#bsel');if(s){s.onchange=function(){db.cur=s.value;save();route();};}}
 function itemQty(i){return fmt1(i.qty)+' '+esc(i.unit);}
@@ -176,23 +220,24 @@ function vHome(){
   var resv=sum(db.commandes.filter(function(c){return c.b===b.id;}),'qty');
   if(resv>s.alive){alerts.push('Commandes en attente ('+resv+' poulets) supérieures aux poulets vivants ('+s.alive+')');}
   if(s.rate>5){alerts.push('Mortalité élevée : '+pct(s.rate)+' (au-dessus de 5 %)');}
+  if(isP(b)){var pi0=ponteInfo(b,s);if(pi0.drop){alerts.push('Baisse de ponte : '+fmt(pi0.last.n)+' œufs au lieu de '+fmt(pi0.prevAvg)+' en moyenne. Vérifiez eau, aliment, chaleur, stress.');}}
   var html='<div class="screen"><div class="top"><div style="display:flex;align-items:center;gap:10px"><div class="logo" style="width:44px;height:44px">'+LOGO+'</div><h1 style="font-size:17px;white-space:nowrap">Mon Poulailler</h1></div>'+bsel()+'</div>'+
   (db.pending.length?'<a class="box" href="#/valider" style="display:block;text-decoration:none;margin-bottom:14px;background:var(--amberBg);color:var(--amber)"><b>'+db.pending.length+' saisie'+(db.pending.length>1?'s':'')+' des gérants à valider</b><div class="sm" style="color:var(--amber)">Touchez pour vérifier et valider</div></a>':'')+
   updBox()+licCard()+'<div class="hero"><div><div class="s">Jour</div><div class="n">'+dayN(b)+'</div><div class="s">'+esc(b.nom)+(b.fin?' · terminée':'')+'</div></div>'+
-  '<div><div class="s">Poulets vivants</div><div class="n">'+s.alive+'</div><div class="s">sur '+b.nb+' mis en place</div></div></div>'+
+  '<div><div class="s">'+(isP(b)?'Pondeuses vivantes':'Poulets vivants')+'</div><div class="n">'+s.alive+'</div><div class="s">sur '+b.nb+' mis en place</div></div></div>'+
   '<div class="box redbox" style="margin-bottom:14px;display:flex;justify-content:space-between;align-items:center"><b>Mortalité</b><span><b>'+s.dead+'</b> morts · <b>'+pct(s.rate)+'</b></span></div>'+
   '<div class="grid3"><div class="kpi"><div class="sm">Dépenses</div><div class="v" style="color:var(--red)">'+fmt(s.depT)+'</div></div>'+
   '<div class="kpi"><div class="sm">Ventes</div><div class="v">'+fmt(s.venT)+'</div></div>'+
   '<div class="kpi"><div class="sm">'+(s.profit<0?'Perte':'Bénéfice')+'</div><div class="v" style="color:'+(s.profit<0?'var(--red)':'var(--green)')+'">'+fmt(Math.abs(s.profit))+'</div></div></div>'+
-  prixCard()+statCard()+climCard()+
+  (isP(b)?ponteCard(b,s):'')+prixCard()+statCard()+(isP(b)?'':climCard())+
   '<div class="card"><div class="h2">Alertes</div>'+(alerts.length?alerts.map(function(a){return '<div class="line"><span>⚠ '+a+'</span></div>';}).join(''):'<div class="sm">Aucune alerte pour le moment.</div>')+'</div>'+
-  '<a class="btn" href="#/saisie">Saisie du jour</a>'+
+  (isP(b)?'<a class="btn" href="#/oeufs">Ramassage des œufs</a>':'')+
+  '<a class="btn'+(isP(b)?' alt':'')+'" href="#/saisie">Saisie du jour (mortalité, aliment)</a>'+
   '<a class="btn red" href="#/depense/new">Ajouter une dépense</a>'+
-  '<a class="btn alt" href="#/vente/new">Enregistrer une vente</a>'+
+  (isP(b)?'<a class="btn alt" href="#/vente/new-oeuf">Vendre des œufs</a><a class="btn alt" href="#/vente/new-reforme">Vendre des poules (réforme)</a>':'<a class="btn alt" href="#/vente/new">Enregistrer une vente</a>')+
   '<a class="btn alt" href="#/bilan">Bilan et bénéfices</a>'+
   '<a class="btn alt" href="#/dettes">Dettes (par gérant)</a>'+
-  '<a class="btn alt" href="#/simulateur">Simulateur de vague</a>'+
-  '<a class="btn alt" href="#/climat">Température et météo</a>'+
+  (isP(b)?'':'<a class="btn alt" href="#/simulateur">Simulateur de vague</a><a class="btn alt" href="#/climat">Température et météo</a>')+
   '<a class="btn alt" href="#/employes">Gérants et envoi automatique</a>'+
   '<a class="btn alt" href="#/securite">'+(pinOn()?'🔒 Code de verrouillage (activé)':'Code de verrouillage')+'</a>'+
   '<div class="card" style="margin-top:18px"><div class="h2">Sauvegarde</div><div class="sm" style="margin-bottom:10px">Vos données sont gardées sur ce téléphone. Faites une copie de temps en temps.</div>'+
@@ -349,12 +394,12 @@ function vVentes(){
   prixCard()+
   '<div class="card"><div class="box" style="margin-bottom:12px"><div class="sm" style="color:var(--pDk)">'+(s.profit<0?'Perte de la vague':'Bénéfice de la vague')+'</div><div class="big" style="font-size:28px;color:'+(s.profit<0?'var(--red)':'var(--pDk)')+'">'+fmt(Math.abs(s.profit))+' <small>FCFA</small></div></div>'+
   '<div class="row" style="margin-bottom:10px"><div><div class="sm">Total des ventes</div><div class="big" style="font-size:17px">'+fmt(s.venT)+'</div></div><div><div class="sm">Total des dépenses</div><div class="big" style="font-size:17px">'+fmt(s.depT)+'</div></div></div>'+
-  '<div class="row"><div><div class="sm">Coût de revient / poulet vendu</div><div class="big" style="font-size:17px">'+(s.sold?fmt(s.costSold):'—')+'</div></div><div><div class="sm">Prix moyen de vente</div><div class="big" style="font-size:17px">'+(s.sold?fmt(s.avgPrice):'—')+'</div></div></div>'+
-  '<div class="sm" style="margin-top:10px">'+s.sold+' poulets vendus sur '+b.nb+' mis en place ('+s.dead+' morts, '+s.alive+' restants)</div></div>'+
-  '<a class="btn" href="#/vente/new">+ Enregistrer une vente</a>'+
+  (isP(b)?'<div class="row"><div><div class="sm">Ventes d\'œufs</div><div class="big" style="font-size:17px">'+fmt(s.venO)+'</div></div><div><div class="sm">Ventes de poules</div><div class="big" style="font-size:17px">'+fmt(s.venP)+'</div></div></div><div class="sm" style="margin-top:10px">'+s.pl+' plateaux d\'œufs vendus · stock : '+plat(s.oStock)+' · '+s.sold+' poules réformées</div>':'<div class="row"><div><div class="sm">Coût de revient / poulet vendu</div><div class="big" style="font-size:17px">'+(s.sold?fmt(s.costSold):'—')+'</div></div><div><div class="sm">Prix moyen de vente</div><div class="big" style="font-size:17px">'+(s.sold?fmt(s.avgPrice):'—')+'</div></div></div>'+
+  '<div class="sm" style="margin-top:10px">'+s.sold+' poulets vendus sur '+b.nb+' mis en place ('+s.dead+' morts, '+s.alive+' restants)</div>')+'</div>'+
+  (isP(b)?'<a class="btn" href="#/vente/new-oeuf">+ Vendre des œufs</a><a class="btn alt" href="#/vente/new-reforme">+ Vendre des poules (réforme)</a>':'<a class="btn" href="#/vente/new">+ Enregistrer une vente</a>')+
   '<a class="btn alt" href="#/bilan">Voir le bilan complet</a>'+
   '<a class="btn alt" href="#/commandes">Commandes en attente ('+db.commandes.filter(function(c){return c.b===b.id;}).length+')</a>'+
-  (list.length?list.map(function(x){var reste=Math.max(0,x.total-x.recu);return '<a class="item" href="#/vente/'+x.id+'"><div class="main"><div class="t">'+esc(x.client||'Client')+'</div><div class="d">'+x.qty+' poulets × '+fmt(x.pu)+(x.who?' · par '+esc(x.who):'')+'</div></div><div class="r"><div class="v">'+fmt(x.total)+'</div><div class="d">'+fd(x.date)+'</div>'+(reste>0?'<span class="tag">À encaisser '+fmt(reste)+'</span>':'')+'</div></a>';}).join(''):'<div class="empty">Aucune vente pour le moment.</div>')+'</div>';
+  (list.length?list.map(function(x){var reste=Math.max(0,x.total-x.recu);return '<a class="item" href="#/vente/'+x.id+'"><div class="main"><div class="t">'+esc(x.client||'Client')+'</div><div class="d">'+x.qty+(x.prod==='oeuf'?' plateaux':(x.prod==='reforme'?' poules':' poulets'))+' × '+fmt(x.pu)+(x.who?' · par '+esc(x.who):'')+'</div></div><div class="r"><div class="v">'+fmt(x.total)+'</div><div class="d">'+fd(x.date)+'</div>'+(reste>0?'<span class="tag">À encaisser '+fmt(reste)+'</span>':'')+'</div></a>';}).join(''):'<div class="empty">Aucune vente pour le moment.</div>')+'</div>';
   return {html:html,theme:'t-green',init:function(){bindBsel();bindPrix();}};
 }
 function vVenteForm(id){
@@ -362,14 +407,17 @@ function vVenteForm(id){
   var cm=(id&&id.indexOf('c_')===0)?db.commandes.filter(function(x){return x.id===id.slice(2);})[0]:null;
   var o=(id&&id!=='new'&&!cm)?db.ventes.filter(function(x){return x.id===id;})[0]:null;
   var d=o||(cm?{date:todayISO(),client:cm.client,qty:cm.qty,pu:cm.pu,poids:'',pay:cm.pay,recu:'',note:'Livraison de commande'}:{date:todayISO(),client:'',qty:'',pu:(db.prix&&db.prix.v)||'',poids:'',pay:'Espèces',recu:'',note:''});
-  var avail=s.alive+(o?o.qty:0);
-  var html='<div class="screen"><div class="ttl"><a class="back" href="#/ventes" aria-label="Retour">‹</a><h1>'+(o?'Modifier la vente':(cm?'Livrer la commande':'Nouvelle vente'))+'</h1></div><form id="f" onsubmit="return false">'+
+  var prod=o?(o.prod||'poulet'):(id==='new-oeuf'?'oeuf':(id==='new-reforme'?'reforme':(isP(b)?'reforme':'poulet')));
+  if(!o&&!cm&&prod==='oeuf'){d.pu='';}
+  var avail=prod==='oeuf'?(s.oStock+(o?o.qty*30:0)):(s.alive+(o?o.qty:0));
+  var W=prod==='oeuf'?{q:'Nombre de plateaux (30 œufs)',p:'Prix par plateau',t:'Vente d\'œufs'}:(prod==='reforme'?{q:'Nombre de poules',p:'Prix par poule',t:'Vente de poules (réforme)'}:{q:'Nombre de poulets',p:'Prix par poulet',t:'Nouvelle vente'});
+  var html='<div class="screen"><div class="ttl"><a class="back" href="#/ventes" aria-label="Retour">‹</a><h1>'+(o?'Modifier la vente':(cm?'Livrer la commande':W.t))+'</h1></div><form id="f" onsubmit="return false">'+
   '<div class="row fld"><div><label class="l" for="f_date">Date</label><input class="in" id="f_date" type="date" value="'+esc(d.date)+'"></div><div><div class="l">Vague</div><div class="in" style="display:flex;align-items:center">'+esc(b.nom)+'</div></div></div>'+
   (cm?'<div class="box" style="margin-bottom:14px">Acompte déjà reçu : <b>'+fmt(cm.recu)+' FCFA</b> · Total convenu : <b>'+fmt(cm.total)+' FCFA</b><div class="sm" style="color:var(--pDk)">Indiquez le montant total reçu (acompte + solde). Vide = payé en totalité.</div></div>':'')+
   '<div class="fld"><label class="l" for="f_client">Client</label><input class="in" id="f_client" type="text" value="'+esc(d.client)+'" placeholder="Nom du client"></div>'+
-  '<div class="row"><div><label class="l" for="f_qty">Nombre de poulets</label><input class="in" id="f_qty" type="text" inputmode="numeric" value="'+esc(d.qty)+'"></div><div><label class="l" for="f_pu">Prix par poulet</label><input class="in" id="f_pu" type="text" inputmode="decimal" value="'+esc(d.pu)+'"></div></div>'+
-  '<div class="sm fld" style="margin-top:6px">Poulets restants après cette vente : <b id="f_left">'+avail+'</b></div>'+
-  '<div class="fld"><label class="l" for="f_poids">Poids total en kg (facultatif)</label><input class="in" id="f_poids" type="text" inputmode="decimal" value="'+esc(d.poids)+'" placeholder="ex. : 380"></div>'+
+  '<div class="row"><div><label class="l" for="f_qty">'+W.q+'</label><input class="in" id="f_qty" type="text" inputmode="numeric" value="'+esc(d.qty)+'"></div><div><label class="l" for="f_pu">'+W.p+'</label><input class="in" id="f_pu" type="text" inputmode="decimal" value="'+esc(d.pu)+'"></div></div>'+
+  '<div class="sm fld" style="margin-top:6px">'+(prod==='oeuf'?'Stock d\'œufs après cette vente : ':(prod==='reforme'?'Poules restantes après cette vente : ':'Poulets restants après cette vente : '))+'<b id="f_left">'+(prod==='oeuf'?plat(avail):avail)+'</b></div>'+
+  '<div class="fld"'+(prod==='oeuf'?' style="display:none"':'')+'><label class="l" for="f_poids">Poids total en kg (facultatif)</label><input class="in" id="f_poids" type="text" inputmode="decimal" value="'+esc(d.poids)+'" placeholder="ex. : 380"></div>'+
   '<div class="box" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><b>Total de la vente</b><span class="big" style="color:var(--pDk)"><span id="f_total">0</span> <small>FCFA</small></span></div>'+
   '<div class="fld"><div class="l">Mode de paiement</div>'+chips('pay',PAYS,d.pay)+'</div>'+
   '<div class="row fld"><div><label class="l" for="f_recu">Montant reçu</label><input class="in" id="f_recu" type="text" inputmode="decimal" value="'+esc(o?o.recu:'')+'" placeholder="Vide = payé en totalité"></div><div><div class="l">Reste à encaisser</div><div class="in" style="display:flex;align-items:center;font-weight:700" id="f_reste">0 FCFA</div></div></div>'+
@@ -380,20 +428,58 @@ function vVenteForm(id){
     var calc=function(){
       var q=Math.floor(num($('#f_qty').value)),t=Math.round(q*num($('#f_pu').value)),rv=$('#f_recu').value.trim();
       var recu=rv===''?(chipVal('pay')==='À crédit'?0:t):Math.round(num(rv));
-      $('#f_total').textContent=fmt(t);$('#f_left').textContent=Math.max(0,avail-q);$('#f_reste').textContent=fmt(Math.max(0,t-recu))+' FCFA';
+      $('#f_total').textContent=fmt(t);$('#f_left').textContent=prod==='oeuf'?plat(Math.max(0,avail-q*30)):Math.max(0,avail-q);$('#f_reste').textContent=fmt(Math.max(0,t-recu))+' FCFA';
       return {q:q,t:t,recu:recu};
     };
     $('#f').addEventListener('input',calc);hooks.chip=calc;calc();
     $('#save').onclick=function(){
       var c=calc();
-      if(!(c.q>0)){toast('Saisissez le nombre de poulets');return;}
-      if(c.q>avail){toast('Il ne reste que '+avail+' poulets vivants');return;}
-      var v={id:o?o.id:uid(),ts:o?o.ts:Date.now(),b:b.id,who:(o?o.who:(cm?cm.who:''))||'',date:$('#f_date').value||todayISO(),client:$('#f_client').value.trim(),qty:c.q,pu:num($('#f_pu').value),total:c.t,poids:num($('#f_poids').value)||'',pay:chipVal('pay'),recu:c.recu,note:$('#f_note').value.trim()};
+      if(!(c.q>0)){toast(prod==='oeuf'?'Saisissez le nombre de plateaux':'Saisissez le nombre de '+(prod==='reforme'?'poules':'poulets'));return;}
+      if(prod==='oeuf'){if(c.q*30>avail&&!confirm('Votre stock d\'œufs enregistré est de '+plat(avail)+'. Enregistrer quand même cette vente ?')){return;}}
+      else if(c.q>avail){toast('Il ne reste que '+avail+(prod==='reforme'?' poules vivantes':' poulets vivants'));return;}
+      var v={id:o?o.id:uid(),ts:o?o.ts:Date.now(),b:b.id,who:(o?o.who:(cm?cm.who:''))||'',date:$('#f_date').value||todayISO(),client:$('#f_client').value.trim(),qty:c.q,pu:num($('#f_pu').value),total:c.t,poids:prod==='oeuf'?'':(num($('#f_poids').value)||''),pay:chipVal('pay'),recu:c.recu,note:$('#f_note').value.trim()};
+      if(prod!=='poulet'){v.prod=prod;}else if(o&&o.prod){v.prod=o.prod;}
       if(o){db.ventes[db.ventes.indexOf(o)]=v;}else{db.ventes.push(v);}
       if(cm){db.commandes=db.commandes.filter(function(x){return x!==cm;});}
       save();toast('Vente enregistrée');location.hash='#/ventes';
     };
     if(o){$('#del').onclick=function(){if(confirm('Supprimer cette vente ?')){db.ventes=db.ventes.filter(function(x){return x.id!==o.id;});save();toast('Vente supprimée');location.hash='#/ventes';}};}
+  }};
+}
+
+/* ---------- Ponte : ramassage des œufs ---------- */
+function vOeufs(){
+  var b=curBande(),s=stats(b);
+  if(!isP(b)){return {html:'<div class="screen"><div class="top"><h1>Ramassage des œufs</h1>'+bsel()+'</div><div class="box redbox"><b>Cette vague est une vague de poulets de chair.</b><div class="sm" style="color:var(--redDk)">Choisissez une vague de pondeuses ci-dessus, ou créez-en une dans « Vagues ».</div></div><a class="btn alt" href="#/bande/new">+ Nouvelle vague de pondeuses</a></div>',theme:'t-green',init:bindBsel};}
+  var pi=ponteInfo(b,s),list=pi.list.slice(0,30);
+  var html='<div class="screen"><div class="top"><h1>Ramassage des œufs</h1>'+bsel()+'</div>'+
+  (pi.drop?'<div class="box redbox" style="margin-bottom:12px"><b>⚠ Baisse de ponte</b><div class="sm" style="color:var(--redDk)">'+fmt(pi.last.n)+' œufs au lieu de '+fmt(pi.prevAvg)+' en moyenne. Vérifiez l\'eau, l\'aliment, la chaleur et les maladies.</div></div>':'')+
+  '<div class="card"><div class="row"><div><div class="sm">Taux de ponte (dernier jour)</div><div class="big" style="font-size:22px">'+pct(pi.rateLast)+'</div></div><div><div class="sm">Moyenne 7 jours</div><div class="big" style="font-size:22px">'+pct(pi.rate7)+'</div></div></div>'+
+  '<div class="row" style="margin-top:10px"><div><div class="sm">Stock d\'œufs</div><b>'+plat(s.oStock)+'</b></div><div><div class="sm">Pondeuses vivantes</div><b>'+s.alive+'</b></div></div>'+
+  '<div class="sm" style="margin-top:10px">Ramassés : '+fmt(s.rec)+' · cassés : '+fmt(s.cas)+' ('+pct(pi.casPct)+') · vendus : '+s.pl+' plateaux'+(pi.costPl>0?' · coût du plateau : '+fmt(pi.costPl)+' FCFA':'')+'</div></div>'+
+  '<div class="card"><div class="h2" id="oeT">Saisir le ramassage</div><div class="fld"><label class="l" for="f_date">Date</label><input class="in" id="f_date" type="date" value="'+todayISO()+'"></div>'+
+  '<div class="row fld"><div><label class="l" for="f_n">Œufs ramassés</label><input class="in" id="f_n" type="text" inputmode="numeric" placeholder="ex. : 420"></div><div><label class="l" for="f_c">Œufs cassés</label><input class="in" id="f_c" type="text" inputmode="numeric" placeholder="0"></div></div>'+
+  '<div class="sm fld">Taux de ponte : <b id="f_tx">—</b></div>'+
+  '<button class="btn" type="button" id="save">Enregistrer</button><button class="btn danger" type="button" id="del" style="display:none">Supprimer ce jour</button></div>'+
+  '<div class="card"><div class="h2">Derniers jours</div>'+(list.length?list.map(function(x){return '<div class="line" data-oe="'+esc(x.id)+'" style="cursor:pointer"><span>'+fd(x.date)+' · <b>'+fmt(x.n)+'</b> œufs'+(x.casses>0?' · '+fmt(x.casses)+' cassés':'')+'</span><span class="sm">'+pct(x.n/Math.max(1,s.alive)*100)+'</span></div>';}).join('')+'<div class="sm" style="margin-top:8px">Touchez un jour pour le modifier.</div>':'<div class="sm">Aucun ramassage enregistré.</div>')+'</div>'+
+  '<a class="btn alt" href="#/vente/new-oeuf">Vendre des œufs</a></div>';
+  return {html:html,theme:'t-green',init:function(){
+    bindBsel();
+    var cur=null,tx=function(){var n=Math.floor(num($('#f_n').value));$('#f_tx').textContent=n>0?pct(n/Math.max(1,s.alive)*100):'—';};
+    $('#f_n').oninput=tx;
+    app.querySelectorAll('[data-oe]').forEach(function(el){el.onclick=function(){
+      var x=(db.oeufs||[]).filter(function(y){return y.id===el.dataset.oe;})[0];if(!x){return;}cur=x;
+      $('#f_date').value=x.date;$('#f_n').value=x.n;$('#f_c').value=x.casses||'';$('#oeT').textContent='Modifier le '+fd(x.date);$('#del').style.display='';tx();window.scrollTo(0,0);};});
+    $('#save').onclick=function(){
+      var dt=$('#f_date').value||todayISO(),n=Math.floor(num($('#f_n').value)),c=Math.floor(num($('#f_c').value));
+      if($('#f_n').value.trim()===''){toast('Saisissez le nombre d\'œufs ramassés');return;}
+      if(c>n){toast('Les œufs cassés ne peuvent pas dépasser les œufs ramassés');return;}
+      db.oeufs=db.oeufs||[];
+      var ex=cur||db.oeufs.filter(function(y){return y.b===b.id&&y.date===dt;})[0];
+      if(ex){ex.date=dt;ex.n=n;ex.casses=c;ex.ts=Date.now();}else{db.oeufs.push({id:uid(),ts:Date.now(),b:b.id,date:dt,n:n,casses:c});}
+      save();toast('Ramassage enregistré');route();
+    };
+    $('#del').onclick=function(){if(cur&&confirm('Supprimer ce ramassage ?')){db.oeufs=db.oeufs.filter(function(y){return y!==cur;});save();toast('Supprimé');route();}};
   }};
 }
 
@@ -403,27 +489,34 @@ function vBandes(){
   var html='<div class="screen"><div class="top"><h1>Vagues</h1></div><a class="btn" href="#/bande/new">+ Nouvelle vague</a>'+
   db.bandes.slice().reverse().map(function(b){var s=stats(b);
     return '<div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><div class="h2" style="margin:0">'+esc(b.nom)+'</div>'+(b.id===db.cur?'<span class="tag" style="background:var(--greenBg);color:var(--greenDk)">Vague affichée</span>':'')+'</div>'+
-    '<div class="sm" style="margin:6px 0 10px">Arrivée le '+fd(b.date)+'/'+b.date.slice(0,4)+' · '+b.nb+' poussins · jour '+dayN(b)+(b.fin?' · terminée':'')+'</div>'+
+    '<div class="sm" style="margin:6px 0 10px">'+(isP(b)?'🥚 Ponte · ':'')+'Arrivée le '+fd(b.date)+'/'+b.date.slice(0,4)+' · '+b.nb+(isP(b)?' pondeuses':' poussins')+' · jour '+dayN(b)+(b.fin?' · terminée':'')+'</div>'+
     '<div class="row" style="margin-bottom:12px"><div><div class="sm">Vivants</div><b>'+s.alive+'</b></div><div><div class="sm">Mortalité</div><b class="mort">'+pct(s.rate)+'</b></div><div><div class="sm">'+(s.profit<0?'Perte':'Bénéfice')+'</div><b>'+fmt(Math.abs(s.profit))+'</b></div></div>'+
     '<div class="row">'+(b.id!==db.cur?'<button class="btn alt sm" style="padding:0 4px;font-size:14px" type="button" data-pick="'+b.id+'">Afficher</button>':'')+'<a class="btn alt sm" style="padding:0 4px;font-size:14px" href="#/bilan/'+b.id+'">Bilan</a>'+'<button class="btn alt sm" style="padding:0 4px;font-size:14px" type="button" data-fin="'+b.id+'">'+(b.fin?'Rouvrir':'Terminer')+'</button><button class="btn danger sm" style="padding:0 4px;font-size:14px" type="button" data-delb="'+b.id+'">Supprimer</button></div></div>';}).join('')+'</div>';
   return {html:html,theme:'t-green'};
 }
 function vBandeForm(){
   var first=!db.bandes.length;
-  var html='<div class="screen">'+(first?'<div class="welcome"><div class="logo" data-vtap="1">'+LOGO+'</div><h1>Bienvenue dans Mon Poulailler</h1><p>Gérez vos poulets de chair : dépenses, stock, mortalité et ventes.</p></div>':'<div class="ttl"><a class="back" href="#/bandes" aria-label="Retour">‹</a><h1>Nouvelle vague</h1></div>')+
-  '<form id="f" onsubmit="return false"><div class="fld"><label class="l" for="f_nom">Nom de la vague</label><input class="in" id="f_nom" type="text" value="Vague '+(db.bandes.length+1)+'"></div>'+
-  '<div class="row fld"><div><label class="l" for="f_date">Date d\'arrivée des poussins</label><input class="in" id="f_date" type="date" value="'+todayISO()+'"></div><div><label class="l" for="f_nb">Nombre de poussins</label><input class="in" id="f_nb" type="text" inputmode="numeric" placeholder="ex. : 500"></div></div>'+
-  '<div class="fld"><label class="l" for="f_pu">Prix d\'un poussin en FCFA (facultatif)</label><input class="in" id="f_pu" type="text" inputmode="decimal" placeholder="ex. : 900"><div class="sm" style="margin-top:6px">Si vous le remplissez, l\'achat des poussins est ajouté aux dépenses.</div></div>'+
+  var html='<div class="screen">'+(first?'<div class="welcome"><div class="logo" data-vtap="1">'+LOGO+'</div><h1>Bienvenue dans Mon Poulailler</h1><p>Gérez vos poulets de chair et vos pondeuses : dépenses, stock, mortalité, ponte et ventes.</p></div>':'<div class="ttl"><a class="back" href="#/bandes" aria-label="Retour">‹</a><h1>Nouvelle vague</h1></div>')+
+  '<form id="f" onsubmit="return false"><div class="fld"><div class="l">Type d\'élevage</div>'+chips('typ',['Poulets de chair','Pondeuses'],'Poulets de chair')+'</div><div class="fld"><label class="l" for="f_nom">Nom de la vague</label><input class="in" id="f_nom" type="text" value="Vague '+(db.bandes.length+1)+'"></div>'+
+  '<div class="row fld"><div><label class="l" for="f_date" id="l_date">Date d\'arrivée des poussins</label><input class="in" id="f_date" type="date" value="'+todayISO()+'"></div><div><label class="l" for="f_nb" id="l_nb">Nombre de poussins</label><input class="in" id="f_nb" type="text" inputmode="numeric" placeholder="ex. : 500"></div></div>'+
+  '<div class="fld"><label class="l" for="f_pu" id="l_pu">Prix d\'un poussin en FCFA (facultatif)</label><input class="in" id="f_pu" type="text" inputmode="decimal" placeholder="ex. : 900"><div class="sm" style="margin-top:6px" id="l_pn">Si vous le remplissez, l\'achat des poussins est ajouté aux dépenses.</div></div>'+
+  '<div class="fld" id="w_age" style="display:none"><label class="l" for="f_age">Âge à l\'arrivée en semaines (facultatif)</label><input class="in" id="f_age" type="text" inputmode="numeric" placeholder="ex. : 18 (pondeuses prêtes à pondre)"></div>'+
   '<button class="btn" type="button" id="save">'+(first?'Commencer':'Créer la vague')+'</button></form>'+
   (first?'<div class="card" style="margin-top:14px"><div class="sm" style="margin-bottom:8px">Vous avez déjà une sauvegarde ?</div><button class="btn alt sm" type="button" data-import="1">Importer une sauvegarde</button><input type="file" id="impfile" accept=".json,application/json" hidden></div>':'')+'</div>';
   return {html:html,theme:'t-green',init:function(){
+    var tp=function(){return chipVal('typ')==='Pondeuses';};
+    hooks.chip=function(g){if(g!=='typ'){return;}var p=tp();
+      $('#l_date').textContent=p?'Date d\'arrivée des pondeuses':'Date d\'arrivée des poussins';$('#l_nb').textContent=p?'Nombre de pondeuses':'Nombre de poussins';
+      $('#l_pu').textContent=p?'Prix d\'une pondeuse en FCFA (facultatif)':'Prix d\'un poussin en FCFA (facultatif)';$('#l_pn').textContent=p?'Si vous le remplissez, l\'achat des pondeuses est ajouté aux dépenses.':'Si vous le remplissez, l\'achat des poussins est ajouté aux dépenses.';
+      $('#w_age').style.display=p?'':'none';};
     $('#save').onclick=function(){
       var nb=Math.floor(num($('#f_nb').value));
-      if(!(nb>0)){toast('Saisissez le nombre de poussins');return;}
+      if(!(nb>0)){toast(tp()?'Saisissez le nombre de pondeuses':'Saisissez le nombre de poussins');return;}
       var b={id:uid(),nom:$('#f_nom').value.trim()||('Vague '+(db.bandes.length+1)),date:$('#f_date').value||todayISO(),nb:nb};
+      if(tp()){b.type='ponte';var ag=Math.floor(num($('#f_age').value));if(ag>0){b.age0=ag;}}
       db.bandes.push(b);db.cur=b.id;
       var pu=num($('#f_pu').value);
-      if(pu>0){db.depenses.push({id:uid(),ts:Date.now(),b:b.id,date:b.date,cat:'Poussins',desig:"Poussins d'un jour",qty:nb,unit:'unité',pu:pu,total:Math.round(nb*pu),four:'',pay:'Espèces',note:''});}
+      if(pu>0){db.depenses.push({id:uid(),ts:Date.now(),b:b.id,date:b.date,cat:'Poussins',desig:tp()?'Pondeuses':"Poussins d'un jour",qty:nb,unit:'unité',pu:pu,total:Math.round(nb*pu),four:'',pay:'Espèces',note:''});}
       save();toast('Vague créée');location.hash='#/accueil';
     };
   }};
@@ -449,7 +542,7 @@ function hm(t){var d=new Date(t);return ('0'+d.getHours()).slice(-2)+':'+('0'+d.
 function onWHome(){var h=location.hash||'#/accueil';return h==='#/accueil'||h==='#/whome';}
 function fieldEl(id){var l=app.querySelectorAll('input[data-f]');for(var i=0;i<l.length;i++){if(l[i].dataset.f===id){return l[i];}}return null;}
 
-/* --- Côté propriétaire --- */
+/* --- Côté promoteur --- */
 function ownerToken(){
   var f=cfg.fb;
   return fetchT('https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key='+encodeURIComponent(f.key),
@@ -487,10 +580,11 @@ async function ownerSync(silent){
   finally{syncing=false;}
 }
 function cleanReport(x){
-  var o={id:String(x.id).replace(/[^A-Za-z0-9_-]/g,'').slice(0,40),type:(x.type==='vente'||x.type==='commande')?x.type:'mort',who:String(x.who||'').slice(0,40),
+  var o={id:String(x.id).replace(/[^A-Za-z0-9_-]/g,'').slice(0,40),type:(x.type==='vente'||x.type==='commande'||x.type==='oeuf')?x.type:'mort',who:String(x.who||'').slice(0,40),
     date:/^\d{4}-\d\d-\d\d$/.test(String(x.date))?String(x.date):todayISO(),note:String(x.note||'').slice(0,200),ts:num(x.ts)};
   if(o.type==='mort'){o.n=Math.max(0,Math.floor(num(x.n)));o.cause=CAUSES.indexOf(x.cause)>=0?x.cause:'Inconnue';}
-  else{o.client=String(x.client||'').slice(0,60);o.qty=Math.max(0,Math.floor(num(x.qty)));o.pu=Math.max(0,num(x.pu));o.recu=Math.max(0,num(x.recu));o.pay=PAYS.indexOf(x.pay)>=0?x.pay:'Espèces';
+  else if(o.type==='oeuf'){o.n=Math.max(0,Math.floor(num(x.n)));o.casses=Math.min(o.n,Math.max(0,Math.floor(num(x.casses))));}
+  else{if(x.prod==='oeuf'){o.prod='oeuf';}o.client=String(x.client||'').slice(0,60);o.qty=Math.max(0,Math.floor(num(x.qty)));o.pu=Math.max(0,num(x.pu));o.recu=Math.max(0,num(x.recu));o.pay=PAYS.indexOf(x.pay)>=0?x.pay:'Espèces';
     if(o.type==='commande'){o.tel=String(x.tel||'').slice(0,30);o.livr=/^\d{4}-\d\d-\d\d$/.test(String(x.livr))?String(x.livr):'';}}
   return o;
 }
@@ -506,13 +600,19 @@ async function refreshOwner(force){
 }
 function validateReport(id,ok){
   var p=db.pending.filter(function(x){return x.id===id;})[0];if(!p){return;}
-  var b=curBande(),vs=app.querySelector('select[data-vg]');
+  var b=curBande(),vs=app.querySelector('select[data-vg]'),egg=(p.type==='oeuf'||p.prod==='oeuf');
+  if(egg){b=pBandDef();if(!b){toast('Créez d\'abord une vague de pondeuses');return;}}
   var vsel=null;app.querySelectorAll('select[data-vg]').forEach(function(x){if(x.dataset.vg===id){vsel=x;}});
   if(vsel){b=db.bandes.filter(function(x){return x.id===vsel.value;})[0]||b;}
   var s=stats(b);
   if(ok){
     var el=fieldEl(id);
-    if(p.type==='mort'){
+    if(p.type==='oeuf'){
+      var n0=Math.max(0,Math.floor(num(el?el.value:p.n))),ce=app.querySelector('input[data-fc="'+id+'"]'),c0=Math.min(n0,Math.max(0,Math.floor(num(ce?ce.value:p.casses))));
+      db.oeufs=db.oeufs||[];
+      var ex=db.oeufs.filter(function(y){return y.b===b.id&&y.date===p.date;})[0];
+      if(ex){ex.n=n0;ex.casses=c0;ex.ts=Date.now();ex.who=p.who;}else{db.oeufs.push({id:'r'+id,ts:Date.now(),b:b.id,date:p.date,n:n0,casses:c0,who:p.who});}
+    }else if(p.type==='mort'){
       var n=Math.max(0,Math.floor(num(el?el.value:p.n)));
       if(n<=0){toast('Saisissez le nombre de cadavres constatés, ou touchez Rejeter');return;}
       if(n>s.alive){toast('Il ne reste que '+s.alive+' poulets vivants');return;}
@@ -524,8 +624,10 @@ function validateReport(id,ok){
     }else{
       var recu=Math.max(0,Math.round(num(el?el.value:p.recu)));
       if(p.qty<=0){toast('Quantité invalide : rejetez cette saisie');return;}
-      if(p.qty>s.alive){toast('Il ne reste que '+s.alive+' poulets vivants');return;}
-      db.ventes.push({id:'r'+id,ts:Date.now(),b:b.id,date:p.date,client:p.client,qty:p.qty,pu:p.pu,total:Math.round(p.qty*p.pu),poids:'',pay:p.pay,recu:recu,decl:Math.max(0,Math.round(+p.recu||0)),who:p.who,note:p.note||''});
+      if(!egg&&p.qty>s.alive){toast('Il ne reste que '+s.alive+' poulets vivants');return;}
+      var nv={id:'r'+id,ts:Date.now(),b:b.id,date:p.date,client:p.client,qty:p.qty,pu:p.pu,total:Math.round(p.qty*p.pu),poids:'',pay:p.pay,recu:recu,decl:Math.max(0,Math.round(+p.recu||0)),who:p.who,note:p.note||''};
+      if(egg){nv.prod='oeuf';}
+      db.ventes.push(nv);
     }
   }
   db.dec=db.dec||[];db.dec.push({id:id,who:p.who,ok:ok?1:0,ts:Date.now()});if(db.dec.length>400){db.dec=db.dec.slice(-300);}
@@ -538,9 +640,13 @@ function vValider(){
   var b=curBande();
   var list=db.pending.slice().sort(function(a,c){return (a.ts||0)-(c.ts||0);});
   var cards=list.map(function(p){
-    var h='<div class="card"><div style="display:flex;justify-content:space-between;gap:8px"><b>'+esc(p.who||'Gérant')+'</b><span class="sm">'+fd(p.date)+'</span></div>'+(db.bandes.length>1?'<div class="fld" style="margin:8px 0 0"><label class="l">Enregistrer dans la vague</label><select class="in sel" data-vg="'+esc(p.id)+'">'+db.bandes.map(function(x){return '<option value="'+esc(x.id)+'"'+(x.id===curBande().id?' selected':'')+'>'+esc(x.nom)+'</option>';}).join('')+'</select></div>':'');
-    if(p.type!=='mort'&&db.prix&&db.prix.v&&p.pu&&p.pu!==db.prix.v){h+='<div class="box redbox" style="margin:8px 0"><b>⚠ Prix différent du prix du jour</b><div class="sm" style="color:var(--redDk)">Le gérant a saisi '+fmt(p.pu)+' FCFA, le prix du jour est '+fmt(db.prix.v)+' FCFA.</div></div>';}
-    if(p.type==='mort'){
+    var h='<div class="card"><div style="display:flex;justify-content:space-between;gap:8px"><b>'+esc(p.who||'Gérant')+'</b><span class="sm">'+fd(p.date)+'</span></div>'+((function(){var eg=(p.type==='oeuf'||p.prod==='oeuf'),bl=eg?db.bandes.filter(isP):db.bandes,dd=eg?pBandDef():curBande();return bl.length>1?'<div class="fld" style="margin:8px 0 0"><label class="l">Enregistrer dans la vague</label><select class="in sel" data-vg="'+esc(p.id)+'">'+bl.map(function(x){return '<option value="'+esc(x.id)+'"'+(dd&&x.id===dd.id?' selected':'')+'>'+esc(x.nom)+'</option>';}).join('')+'</select></div>':'';})());
+    if(p.type!=='mort'&&p.type!=='oeuf'&&p.prod!=='oeuf'&&db.prix&&db.prix.v&&p.pu&&p.pu!==db.prix.v){h+='<div class="box redbox" style="margin:8px 0"><b>⚠ Prix différent du prix du jour</b><div class="sm" style="color:var(--redDk)">Le gérant a saisi '+fmt(p.pu)+' FCFA, le prix du jour est '+fmt(db.prix.v)+' FCFA.</div></div>';}
+    if(p.type==='oeuf'){
+      h+='<div class="box" style="margin:10px 0"><b>🥚 '+fmt(p.n)+' œufs ramassés, '+fmt(p.casses||0)+' cassés</b>'+(p.note?'<br><span class="sm">'+esc(p.note)+'</span>':'')+'</div>'+
+        '<div class="row"><div><label class="l">Œufs ramassés</label><input class="in" type="text" inputmode="numeric" data-f="'+esc(p.id)+'" value="'+p.n+'"></div><div><label class="l">Œufs cassés</label><input class="in" type="text" inputmode="numeric" data-fc="'+esc(p.id)+'" value="'+(p.casses||0)+'"></div></div>'+
+        '<div class="row" style="margin-top:12px"><button class="btn sm" type="button" data-ok="'+esc(p.id)+'">Valider</button><button class="btn danger sm" type="button" data-no="'+esc(p.id)+'">Rejeter</button></div>';
+    }else if(p.type==='mort'){
       h+='<div class="box redbox" style="margin:10px 0"><b>'+p.n+' mort'+(p.n>1?'s':'')+' signalé'+(p.n>1?'s':'')+'</b><br><span class="sm" style="color:var(--redDk)">Cause : '+esc(p.cause)+(p.note?' · '+esc(p.note):'')+'</span></div>'+
         '<label class="l">Cadavres constatés (après vérification)</label><input class="in" type="text" inputmode="numeric" data-f="'+esc(p.id)+'" value="'+p.n+'">'+
         '<div class="row" style="margin-top:12px"><button class="btn red sm" type="button" data-ok="'+esc(p.id)+'">Valider</button><button class="btn danger sm" type="button" data-no="'+esc(p.id)+'">Rejeter</button></div>';
@@ -551,7 +657,7 @@ function vValider(){
         '<div class="row" style="margin-top:12px"><button class="btn sm" type="button" data-ok="'+esc(p.id)+'">Valider</button><button class="btn danger sm" type="button" data-no="'+esc(p.id)+'">Rejeter</button></div>';
     }else{
       var tot=Math.round(p.qty*p.pu);
-      h+='<div class="box" style="margin:10px 0"><b>'+p.qty+' poulet'+(p.qty>1?'s':'')+' × '+fmt(p.pu)+' = '+fmt(tot)+' FCFA</b><br><span class="sm">'+esc(p.client||'Client')+' · '+esc(p.pay)+' · reçu déclaré : '+fmt(p.recu)+'</span>'+(p.note?'<br><span class="sm">'+esc(p.note)+'</span>':'')+'</div>'+
+      h+='<div class="box" style="margin:10px 0"><b>'+p.qty+(p.prod==='oeuf'?' plateau'+(p.qty>1?'x':'')+' d\'œufs':' poulet'+(p.qty>1?'s':''))+' × '+fmt(p.pu)+' = '+fmt(tot)+' FCFA</b><br><span class="sm">'+esc(p.client||'Client')+' · '+esc(p.pay)+' · reçu déclaré : '+fmt(p.recu)+'</span>'+(p.note?'<br><span class="sm">'+esc(p.note)+'</span>':'')+'</div>'+
         '<label class="l">Montant réellement encaissé (FCFA)</label><input class="in" type="text" inputmode="decimal" data-f="'+esc(p.id)+'" value="'+Math.round(p.recu)+'">'+
         '<div class="row" style="margin-top:12px"><button class="btn sm" type="button" data-ok="'+esc(p.id)+'">Valider</button><button class="btn danger sm" type="button" data-no="'+esc(p.id)+'">Rejeter</button></div>';
     }
@@ -601,7 +707,7 @@ function vEmployes(){
   }};
 }
 function vActivite(){
-  var b=curBande(),P='Propriétaire',ev=[];
+  var b=curBande(),P='Promoteur',ev=[];
   db.ventes.filter(function(v){return v.b===b.id;}).forEach(function(v){ev.push({k:'vente',who:v.who||P,date:v.date,ts:v.ts||0,qty:v.qty,amt:v.total,txt:v.qty+' poulet'+(v.qty>1?'s':'')+' vendu'+(v.qty>1?'s':'')+' · '+fmt(v.total)+' FCFA'+(v.client?' · '+esc(v.client):'')});});
   db.morts.filter(function(m){return m.b===b.id;}).forEach(function(m){ev.push({k:'mort',who:m.who||P,date:m.date,ts:m.ts||0,n:m.n,txt:m.n+' mort'+(m.n>1?'s':'')+' · '+esc(m.cause)});});
   db.commandes.filter(function(c){return c.b===b.id;}).forEach(function(c){ev.push({k:'cmd',who:c.who||P,date:c.date,ts:c.ts||0,qty:c.qty,txt:'Commande : '+c.qty+' poulet'+(c.qty>1?'s':'')+' · '+esc(c.client||'Client')+(c.livr?' · livraison '+fd(c.livr):'')});});
@@ -624,16 +730,19 @@ function vActivite(){
 /* --- Côté gérant --- */
 function repLabel(d){
   if(d.type==='mort'){return d.n+' mort'+(d.n>1?'s':'');}
+  if(d.type==='oeuf'){return '🥚 '+d.n+' œufs ramassés';}
+  if(d.type==='vente'&&d.prod==='oeuf'){return '🥚 '+d.qty+' plateau'+(d.qty>1?'x':'')+' vendu'+(d.qty>1?'s':'');}
   if(d.type==='commande'){return 'Commande : '+d.qty+' poulet'+(d.qty>1?'s':'');}
   return d.qty+' poulet'+(d.qty>1?'s':'')+' vendu'+(d.qty>1?'s':'');
 }
 function repDetail(d){
   if(d.type==='mort'){return ' · '+esc(d.cause);}
+  if(d.type==='oeuf'){return d.casses>0?' · '+d.casses+' cassés':'';}
   if(d.type==='commande'){return ' · '+esc(d.client||'Client')+' · '+(d.recu>0?'acompte '+fmt(d.recu):'sans argent');}
   return ' · '+esc(d.client||'Client')+' · '+fmt(d.qty*d.pu)+' FCFA';
 }
 function vWCmd(){
-  if(cfg.state&&cfg.state.statTs&&!cfg.state.cmd){return {html:'<div class="screen"><div class="ttl"><a class="back" href="#/accueil" aria-label="Retour">‹</a><h1>Prendre une commande</h1></div><div class="box redbox"><b>Les commandes sont fermées</b><div class="sm" style="color:var(--redDk)">'+esc(cfg.state.msg||'Le propriétaire n\'accepte pas de nouvelles commandes pour le moment.')+'</div></div></div>',theme:'t-green'};}
+  if(cfg.state&&cfg.state.statTs&&!cfg.state.cmd){return {html:'<div class="screen"><div class="ttl"><a class="back" href="#/accueil" aria-label="Retour">‹</a><h1>Prendre une commande</h1></div><div class="box redbox"><b>Les commandes sont fermées</b><div class="sm" style="color:var(--redDk)">'+esc(cfg.state.msg||'Le promoteur n\'accepte pas de nouvelles commandes pour le moment.')+'</div></div></div>',theme:'t-green'};}
   var html='<div class="screen"><div class="ttl"><a class="back" href="#/accueil" aria-label="Retour">‹</a><h1>Prendre une commande</h1></div><form id="f" onsubmit="return false">'+
   '<div class="fld"><label class="l" for="f_client">Nom du client</label><input class="in" id="f_client" type="text" placeholder="Nom du client"></div>'+
   '<div class="fld"><label class="l" for="f_tel">Téléphone du client</label><input class="in" id="f_tel" type="tel" inputmode="tel" placeholder="ex. 70 00 00 00"></div>'+
@@ -692,7 +801,7 @@ async function workerFlush(silent){
       var r=await fetchT(fsBase(cfg.worker.proj)+'/reports?documentId='+encodeURIComponent(it.id)+'&key='+encodeURIComponent(cfg.worker.key),
         {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(toFs(it.data))});
       if(r.ok||r.status===409){it.sent=true;it.sentAt=Date.now();n++;saveCfg();}
-      else{fail=r.status===403?"Envoi refusé : le propriétaire doit vérifier la configuration":'Erreur du serveur ('+r.status+')';break;}
+      else{fail=r.status===403?"Envoi refusé : le promoteur doit vérifier la configuration":'Erreur du serveur ('+r.status+')';break;}
     }
   }catch(e){fail=errMsg(e);}
   finally{flushing=false;}
@@ -706,12 +815,12 @@ function iosHint(){
 }
 function vRole(){
   return {html:'<div class="screen"><div class="welcome"><div class="logo" data-vtap="1">'+LOGO+'</div><h1>Bienvenue dans Mon Poulailler</h1><p>Qui utilise ce téléphone ?</p></div>'+
-    '<button class="btn" type="button" data-role="owner" style="height:64px;font-size:18px">Je suis le propriétaire</button>'+
+    '<button class="btn" type="button" data-role="owner" style="height:64px;font-size:18px">Je suis le promoteur</button>'+
     '<button class="btn alt" type="button" data-role="worker" style="height:64px;font-size:18px">Je suis un gérant</button>'+
-    ''+iosHint()+'<div class="sm" style="text-align:center;margin-top:8px">Pour compter les utilisateurs et proposer les mises à jour, un identifiant anonyme du téléphone et la version de l\'application sont envoyés une fois par jour. Aucune donnée d\'élevage n\'est envoyée.</div><div class="sm" style="text-align:center;margin-top:8px">Un gérant signale les mortalités et enregistre les ventes. Le propriétaire les valide.</div></div>',theme:'t-green'};
+    ''+iosHint()+'<div class="sm" style="text-align:center;margin-top:8px">Pour compter les utilisateurs et proposer les mises à jour, un identifiant anonyme du téléphone et la version de l\'application sont envoyés une fois par jour. Aucune donnée d\'élevage n\'est envoyée.</div><div class="sm" style="text-align:center;margin-top:8px">Un gérant signale les mortalités et enregistre les ventes. Le promoteur les valide.</div></div>',theme:'t-green'};
 }
 function vWSetup(){
-  return {html:'<div class="screen"><div class="welcome"><div class="logo">'+LOGO+'</div><h1>Configuration gérant</h1><p>Demandez votre code personnel au propriétaire.</p></div><form onsubmit="return false">'+
+  return {html:'<div class="screen"><div class="welcome"><div class="logo">'+LOGO+'</div><h1>Configuration gérant</h1><p>Demandez votre code personnel au promoteur.</p></div><form onsubmit="return false">'+
     '<div class="fld"><label class="l" for="f_short">Code court (6 caractères)</label><input class="in" id="f_short" type="text" autocapitalize="characters" maxlength="8" placeholder="ex. K7M2QX" style="letter-spacing:3px;font-size:20px"></div><button class="btn" type="button" id="short">Se connecter avec le code court</button>'+
     '<div class="sm" style="text-align:center;margin:14px 0">ou, avec un long code</div>'+
     '<div class="fld"><label class="l" for="f_code">Votre code</label><textarea class="in" id="f_code" rows="4" autocapitalize="none" placeholder="Collez ici le code qui commence par PB1."></textarea></div>'+
@@ -733,15 +842,16 @@ function vWSetup(){
 function vWHome(){
   var q=pendingQ(),list=cfg.queue.slice().reverse().slice(0,20);
   var html='<div class="screen"><div class="top"><div style="display:flex;align-items:center;gap:10px"><div class="logo" style="width:44px;height:44px">'+LOGO+'</div><h1 style="font-size:22px">Bonjour '+esc(cfg.worker.who)+'</h1></div></div>'+
-  '<div class="box" style="margin-bottom:14px;display:flex;justify-content:space-between;align-items:center"><span><b>Prix du jour</b><div class="sm" style="color:var(--pDk)">'+(wPrix()?esc(wPrixNote()):(cfg.pullErr?esc(cfg.pullErr):'Pas encore reçu : ouvrez l\'application avec internet.'))+'</div></span><span class="big">'+(wPrix()?fmt(wPrix())+' <small>FCFA</small>':'—')+'</span></div>'+
-  updBox()+wNoticeBox()+wStatCard()+wDebtBox()+
-  '<div class="box" style="margin-bottom:14px">'+(q.length?'⏳ <b>'+q.length+'</b> saisie'+(q.length>1?'s':'')+' en attente d\'envoi<div class="sm" style="color:var(--pDk);margin-top:4px">'+esc(cfg.flushErr||'Elle sera envoyée dès que le réseau revient.')+'</div>':'✓ Tout est envoyé au propriétaire.')+'</div>'+
+  (wT()==='ponte'?'':'<div class="box" style="margin-bottom:14px;display:flex;justify-content:space-between;align-items:center"><span><b>Prix du jour</b><div class="sm" style="color:var(--pDk)">'+(wPrix()?esc(wPrixNote()):(cfg.pullErr?esc(cfg.pullErr):'Pas encore reçu : ouvrez l\'application avec internet.'))+'</div></span><span class="big">'+(wPrix()?fmt(wPrix())+' <small>FCFA</small>':'—')+'</span></div>')+
+  updBox()+wNoticeBox()+(wT()==='ponte'?'':wStatCard())+wDebtBox()+
+  '<div class="box" style="margin-bottom:14px">'+(q.length?'⏳ <b>'+q.length+'</b> saisie'+(q.length>1?'s':'')+' en attente d\'envoi<div class="sm" style="color:var(--pDk);margin-top:4px">'+esc(cfg.flushErr||'Elle sera envoyée dès que le réseau revient.')+'</div>':'✓ Tout est envoyé au promoteur.')+'</div>'+
   '<a class="btn red" href="#/wmort" style="height:64px;font-size:18px">Signaler une mortalité</a>'+
-  '<a class="btn" href="#/wvente" style="height:64px;font-size:18px">Enregistrer une vente</a>'+
-  ((cfg.state&&cfg.state.statTs&&!cfg.state.cmd)?'<div class="btn alt" style="height:64px;font-size:18px;opacity:.55">Commandes fermées</div>':'<a class="btn alt" href="#/wcmd" style="height:64px;font-size:18px">Prendre une commande</a>')+
+  (wT()==='chair'?'':'<a class="btn" href="#/woeuf" style="height:64px;font-size:18px">🥚 Ramassage des œufs</a><a class="btn'+(wT()==='both'?' alt':'')+'" href="#/woeufv" style="height:64px;font-size:18px">🥚 Vendre des œufs</a>')+
+  (wT()==='ponte'?'':'<a class="btn" href="#/wvente" style="height:64px;font-size:18px">Enregistrer une vente</a>')+
+  (wT()==='ponte'?'':((cfg.state&&cfg.state.statTs&&!cfg.state.cmd)?'<div class="btn alt" style="height:64px;font-size:18px;opacity:.55">Commandes fermées</div>':'<a class="btn alt" href="#/wcmd" style="height:64px;font-size:18px">Prendre une commande</a>'))+
   '<a class="btn alt" href="#/wdettes">Mes dettes</a>'+
   (q.length?'<button class="btn alt" type="button" data-wflush="1">Envoyer maintenant</button>':'')+
-  '<div class="sm" style="margin:6px 0 16px">Le propriétaire vérifie puis valide chaque saisie.</div>'+
+  '<div class="sm" style="margin:6px 0 16px">Le promoteur vérifie puis valide chaque saisie.</div>'+
   '<h2 class="h2">Mes dernières saisies</h2>'+
   (list.length?list.map(function(x){var d=x.data;
     return '<div class="item"><div class="main"><div class="t'+(d.type==='mort'?' mort':'')+'">'+repLabel(d)+'</div><div class="d">'+fd(d.date)+repDetail(d)+'</div></div><div class="r"><span class="tag" style="background:'+(cfg.mydec&&cfg.mydec[x.id]===0?'var(--redBg,#FDECEC);color:var(--red)':(x.sent?'var(--greenBg);color:var(--greenDk)':'var(--amberBg);color:var(--amber)'))+'">'+(function(){var dv=cfg.mydec&&cfg.mydec[x.id];return dv===1?'Validée ✓':(dv===0?'Rejetée ✗':(x.sent?'Envoyé ✓':'En attente'));})()+'</span></div></div>';}).join(''):'<div class="empty">Aucune saisie pour le moment.</div>')+
@@ -757,10 +867,10 @@ function vWHome(){
 function vWMort(){
   var html='<div class="screen"><div class="ttl"><a class="back" href="#/accueil" aria-label="Retour">‹</a><h1>Signaler une mortalité</h1></div><form id="f" onsubmit="return false">'+
   '<div class="fld"><label class="l" for="f_date">Date</label><input class="in" id="f_date" type="date" value="'+todayISO()+'"></div>'+
-  '<div class="fld"><div class="l" style="font-size:15px;color:var(--ink)">Nombre de poulets morts</div><div class="stepper"><button type="button" data-step="-1" aria-label="Retirer un mort">−</button><input id="f_n" type="text" inputmode="numeric" value="1" aria-label="Nombre de morts"><button type="button" class="plus" data-step="1" aria-label="Ajouter un mort">+</button></div></div>'+
+  '<div class="fld"><div class="l" style="font-size:15px;color:var(--ink)">Nombre de '+(wT()==='ponte'?'pondeuses mortes':(wT()==='both'?'poulets / pondeuses morts':'poulets morts'))+'</div><div class="stepper"><button type="button" data-step="-1" aria-label="Retirer un mort">−</button><input id="f_n" type="text" inputmode="numeric" value="1" aria-label="Nombre de morts"><button type="button" class="plus" data-step="1" aria-label="Ajouter un mort">+</button></div></div>'+
   '<div class="fld"><div class="l">Cause probable</div>'+chips('cause',CAUSES,'Inconnue','',' mortc')+'</div>'+
   '<div class="fld"><label class="l" for="f_note">Note (facultatif)</label><textarea class="in" id="f_note" rows="2" placeholder="Ex. : trouvés ce matin dans le coin gauche"></textarea></div>'+
-  '<div class="sm" style="margin-bottom:12px">Gardez les cadavres : le propriétaire les verra avant de valider.</div>'+
+  '<div class="sm" style="margin-bottom:12px">Gardez les cadavres : le promoteur les verra avant de valider.</div>'+
   '<button class="btn red" type="button" id="save">Envoyer la mortalité</button></form></div>';
   return {html:html,theme:'t-green',init:function(){
     hooks.step=function(d){var n=Math.max(0,Math.floor(num($('#f_n').value))+d);$('#f_n').value=n;};
@@ -772,11 +882,29 @@ function vWMort(){
     };
   }};
 }
-function vWVente(){
-  var html='<div class="screen"><div class="ttl"><a class="back" href="#/accueil" aria-label="Retour">‹</a><h1>Enregistrer une vente</h1></div><form id="f" onsubmit="return false">'+
+function vWOeuf(){
+  var html='<div class="screen"><div class="ttl"><a class="back" href="#/accueil" aria-label="Retour">‹</a><h1>Ramassage des œufs</h1></div><form id="f" onsubmit="return false">'+
+  '<div class="fld"><label class="l" for="f_date">Date</label><input class="in" id="f_date" type="date" value="'+todayISO()+'"></div>'+
+  '<div class="row fld"><div><label class="l" for="f_n">Œufs ramassés</label><input class="in" id="f_n" type="text" inputmode="numeric" placeholder="ex. : 420"></div><div><label class="l" for="f_c">Œufs cassés</label><input class="in" id="f_c" type="text" inputmode="numeric" placeholder="0"></div></div>'+
+  '<div class="fld"><label class="l" for="f_note">Note (facultatif)</label><textarea class="in" id="f_note" rows="2" placeholder="Ex. : ponte en baisse ce matin"></textarea></div>'+
+  '<div class="sm" style="margin-bottom:12px">Le promoteur vérifiera avant de valider.</div>'+
+  '<button class="btn" type="button" id="save">Envoyer le ramassage</button></form></div>';
+  return {html:html,theme:'t-green',init:function(){
+    $('#save').onclick=function(){
+      if($('#f_n').value.trim()===''){toast('Indiquez le nombre d\'œufs ramassés');return;}
+      var n=Math.floor(num($('#f_n').value)),c=Math.floor(num($('#f_c').value));
+      if(c>n){toast('Les œufs cassés dépassent les œufs ramassés');return;}
+      queueReport({type:'oeuf',date:$('#f_date').value||todayISO(),n:n,casses:c,note:$('#f_note').value.trim().slice(0,200)});
+      toast('Enregistré, envoi en cours…');location.hash='#/accueil';
+    };
+  }};
+}
+function vWVente(prod){
+  var E=prod==='oeuf';
+  var html='<div class="screen"><div class="ttl"><a class="back" href="#/accueil" aria-label="Retour">‹</a><h1>'+(E?'Vendre des œufs':'Enregistrer une vente')+'</h1></div><form id="f" onsubmit="return false">'+
   '<div class="fld"><label class="l" for="f_date">Date</label><input class="in" id="f_date" type="date" value="'+todayISO()+'"></div>'+
   '<div class="fld"><label class="l" for="f_client">Client</label><input class="in" id="f_client" type="text" placeholder="Nom du client"></div>'+
-  '<div class="row fld"><div><label class="l" for="f_qty">Nombre de poulets</label><input class="in" id="f_qty" type="text" inputmode="numeric"></div>'+wPrixField()+'</div><div class="sm" id="f_pxn" style="margin:-6px 0 12px"></div>'+
+  '<div class="row fld"><div><label class="l" for="f_qty">'+(E?'Nombre de plateaux (30 œufs)':'Nombre de poulets')+'</label><input class="in" id="f_qty" type="text" inputmode="numeric"></div>'+(E?'<div><label class="l" for="f_pu">Prix par plateau</label><input class="in" id="f_pu" type="text" inputmode="decimal" placeholder="FCFA"></div>':wPrixField())+'</div><div class="sm" id="f_pxn" style="margin:-6px 0 12px"></div>'+
   '<div class="box" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><b>Total de la vente</b><span class="big" style="color:var(--pDk)"><span id="f_total">0</span> <small>FCFA</small></span></div>'+
   '<div class="fld"><div class="l">Mode de paiement</div>'+chips('pay',PAYS,'Espèces')+'</div>'+
   '<div class="fld"><label class="l" for="f_recu">Montant reçu</label><input class="in" id="f_recu" type="text" inputmode="decimal" placeholder="Vide = payé en totalité"></div>'+
@@ -784,13 +912,15 @@ function vWVente(){
   '<button class="btn" type="button" id="save">Envoyer la vente</button></form></div>';
   return {html:html,theme:'t-green',init:function(){
     var calc=function(){var q=Math.floor(num($('#f_qty').value)),t=Math.round(q*num($('#f_pu').value));$('#f_total').textContent=fmt(t);return {q:q,t:t};};
-    $('#f').addEventListener('input',calc);wPrixInit(calc);
+    $('#f').addEventListener('input',calc);if(!E){wPrixInit(calc);}
     $('#save').onclick=function(){
-      var c=calc(),pu=wPrix();
-      if(!(c.q>0)){toast('Saisissez le nombre de poulets');return;}
-      if(!(pu>0)){toast('Prix du jour non reçu : connectez-vous à internet puis réessayez');return;}
+      var c=calc(),pu=E?num($('#f_pu').value):wPrix();
+      if(!(c.q>0)){toast(E?'Saisissez le nombre de plateaux':'Saisissez le nombre de poulets');return;}
+      if(!(pu>0)){toast(E?'Saisissez le prix du plateau':'Prix du jour non reçu : connectez-vous à internet puis réessayez');return;}
       var rv=$('#f_recu').value.trim(),pay=chipVal('pay'),recu=rv===''?(pay==='À crédit'?0:c.t):Math.round(num(rv));
-      queueReport({type:'vente',date:$('#f_date').value||todayISO(),client:$('#f_client').value.trim().slice(0,60),qty:c.q,pu:pu,recu:recu,pay:pay,note:$('#f_note').value.trim().slice(0,200)});
+      var rp={type:'vente',date:$('#f_date').value||todayISO(),client:$('#f_client').value.trim().slice(0,60),qty:c.q,pu:pu,recu:recu,pay:pay,note:$('#f_note').value.trim().slice(0,200)};
+      if(E){rp.prod='oeuf';}
+      queueReport(rp);
       toast('Enregistré, envoi en cours…');location.hash='#/accueil';
     };
   }};
@@ -1311,9 +1441,10 @@ function bilanTxt(b){
   L.push('Ventes : '+fmt(s.venT)+' FCFA (encaissé '+fmt(d.enc)+', reste '+fmt(d.reste)+')');
   L.push('Dépenses : '+fmt(s.depT)+' FCFA');
   L.push('');
+  if(isP(b)){ponteTxt(b,d,L);}else{
   L.push('Poulets : '+b.nb+' mis en place · '+s.dead+' morts ('+pct(s.rate)+') · '+s.sold+' vendus · '+s.alive+' restants');
   if(s.sold){L.push('Coût de revient / poulet vendu : '+fmt(s.costSold)+' FCFA');L.push('Prix moyen de vente : '+fmt(s.avgPrice)+' FCFA');}
-  L.push('Prix minimum pour ne pas perdre : '+fmt(d.seuil)+' FCFA / poulet');
+  L.push('Prix minimum pour ne pas perdre : '+fmt(d.seuil)+' FCFA / poulet');}
   if(d.catRows.length){L.push('');L.push('Dépenses par catégorie :');d.catRows.forEach(function(c){L.push('- '+c+' : '+fmt(d.cats[c])+' FCFA ('+Math.round(d.cats[c]/s.depT*100)+' %)');});}
   if(d.causeRows.length){L.push('');L.push('Mortalité par cause :');d.causeRows.forEach(function(c){L.push('- '+c+' : '+d.causes[c]);});}
   return L.join('\n');
@@ -1326,18 +1457,18 @@ function vBilan(arg){
   function ln(a,v){return '<div class="line"><span>'+a+'</span><b>'+v+'</b></div>';}
   var html='<div class="screen"><div class="top"><h1>Bilan</h1><select class="in sel" id="bbsel" aria-label="Vague">'+db.bandes.map(function(x){return '<option value="'+x.id+'"'+(x.id===b.id?' selected':'')+'>'+esc(x.nom)+' · jour '+dayN(x)+(x.fin?' (terminée)':'')+'</option>';}).join('')+'</select></div>'+
   '<div class="card" style="text-align:center"><div class="sm">'+(pos?'Bénéfice':'Perte')+' de la vague</div><div class="big" style="font-size:34px;margin:4px 0;color:'+(pos?'var(--green)':'var(--red)')+'">'+(pos?'+':'−')+fmt(Math.abs(s.profit))+' <small>FCFA</small></div>'+
-  '<div class="sm">'+(s.venT?'Marge : '+pct(d.marge)+' des ventes':'Aucune vente pour le moment')+(s.sold?' · '+(pos?'+':'−')+fmt(Math.abs(d.profitSold))+' FCFA par poulet vendu':'')+'</div></div>'+
+  '<div class="sm">'+(s.venT?'Marge : '+pct(d.marge)+' des ventes':'Aucune vente pour le moment')+(s.sold&&!isP(b)?' · '+(pos?'+':'−')+fmt(Math.abs(d.profitSold))+' FCFA par poulet vendu':'')+'</div></div>'+
   '<div class="card"><div class="h2">Argent</div>'+ln('Total des ventes',fmt(s.venT)+' FCFA')+ln('Déjà encaissé',fmt(d.enc)+' FCFA')+
   (d.reste>0?'<div class="line"><span>Reste à encaisser (crédits)</span><b style="color:var(--red)">'+fmt(d.reste)+' FCFA</b></div>':'')+
   '<div class="line"><span>Total des dépenses</span><b style="color:var(--red)">'+fmt(s.depT)+' FCFA</b></div></div>'+
   '<div class="card"><div class="h2">Dépenses par catégorie</div>'+(d.catRows.length?d.catRows.map(function(c){var p=s.depT?d.cats[c]/s.depT*100:0;return '<div style="margin-bottom:10px"><div class="line" style="padding:0"><span>'+esc(c)+'</span><span><b>'+fmt(d.cats[c])+'</b> <span class="sm">· '+Math.round(p)+' %</span></span></div>'+bar(p,'var(--red)')+'</div>';}).join(''):'<div class="sm">Aucune dépense enregistrée.</div>')+'</div>'+
-  '<div class="card"><div class="h2">Poulets et coûts</div>'+ln('Mis en place',b.nb)+ln('Morts','<span class="mort">'+s.dead+' ('+pct(s.rate)+')</span>')+ln('Vendus',s.sold)+ln('Restants vivants',s.alive)+
+  (isP(b)?ponteBilan(b,d,ln):'<div class="card"><div class="h2">Poulets et coûts</div>'+ln('Mis en place',b.nb)+ln('Morts','<span class="mort">'+s.dead+' ('+pct(s.rate)+')</span>')+ln('Vendus',s.sold)+ln('Restants vivants',s.alive)+
   '<div style="border-top:1px solid var(--pB);margin:8px 0"></div>'+
   ln('Coût de revient / poulet vendu',s.sold?fmt(s.costSold)+' FCFA':'—')+ln('Prix moyen de vente',s.sold?fmt(s.avgPrice)+' FCFA':'—')+
   ln('Aliment / poulet vendu',s.sold&&d.aliment?fmt(d.aliment/s.sold)+' FCFA':'—')+
   '<div class="box" style="margin-top:10px"><b>Prix minimum pour ne pas perdre : '+fmt(d.seuil)+' FCFA</b><div class="sm" style="color:var(--pDk)">par poulet, si tous les survivants sont vendus.</div></div>'+
   (d.potentiel!==null?'<div class="box" style="margin-top:8px"><b>Si vous vendez les '+s.alive+' restants au prix moyen : '+(d.potentiel<0?'perte de ':'bénéfice de ')+fmt(Math.abs(d.potentiel))+' FCFA</b></div>':'')+
-  (d.manque>0&&s.alive>0?'<div class="box redbox" style="margin-top:8px"><b>Il faut encore vendre environ '+d.manque+' poulets pour couvrir les dépenses.</b></div>':'')+'</div>'+
+  (d.manque>0&&s.alive>0?'<div class="box redbox" style="margin-top:8px"><b>Il faut encore vendre environ '+d.manque+' poulets pour couvrir les dépenses.</b></div>':'')+'</div>')+
   (d.causeRows.length?'<div class="card"><div class="h2">Mortalité par cause</div>'+d.causeRows.map(function(c){var p=s.dead?d.causes[c]/s.dead*100:0;return '<div style="margin-bottom:10px"><div class="line" style="padding:0"><span>'+esc(c)+'</span><b class="mort">'+d.causes[c]+'</b></div>'+bar(p,'var(--red)')+'</div>';}).join('')+'</div>':'')+
   (Object.keys(d.who).length>1||(Object.keys(d.who)[0]&&Object.keys(d.who)[0]!=='Vous')?'<div class="card"><div class="h2">Ventes par personne</div>'+Object.keys(d.who).sort(function(a,c){return d.who[c].t-d.who[a].t;}).map(function(w){return '<div class="line"><span>'+esc(w)+' <span class="sm">· '+d.who[w].q+' poulets</span></span><b>'+fmt(d.who[w].t)+'</b></div>';}).join('')+'</div>':'')+
   (db.bandes.length>1?'<div class="card"><div class="h2">Comparaison des vagues</div>'+db.bandes.slice().reverse().map(function(x){var t=stats(x);return '<a href="#/bilan/'+x.id+'" style="display:block;text-decoration:none;color:inherit;padding:8px 0;border-top:1px solid var(--pB)"><div class="line" style="padding:0"><b>'+esc(x.nom)+'</b><b style="color:'+(t.profit<0?'var(--red)':'var(--green)')+'">'+(t.profit<0?'−':'+')+fmt(Math.abs(t.profit))+'</b></div><div class="sm">Mortalité '+pct(t.rate)+' · '+t.sold+' vendus · revient à '+(t.sold?fmt(t.costSold):'—')+' / poulet</div></a>';}).join('')+'</div>':'')+
@@ -1376,15 +1507,15 @@ function route(){
   if(r==='securite'&&cfg.role){render(vSecurite(),r);return;}
   if(cfg.role==='worker'){
     if(!cfg.worker&&r!=='wsetup'){location.replace('#/wsetup');return;}
-    var wv={wsetup:vWSetup,wmort:vWMort,wvente:vWVente,wcmd:vWCmd,wdettes:vWDettes};
+    var wv={wsetup:vWSetup,wmort:vWMort,wvente:function(){return vWVente('');},woeuf:vWOeuf,woeufv:function(){return vWVente('oeuf');},wcmd:vWCmd,wdettes:vWDettes};
     render((wv[r]||vWHome)(),r);return;
   }
   if(r==='licence'){render(vLicence(),r);return;}
   var st=licState();
   if(({employes:1,valider:1,activite:1,commandes:1})[r]&&st.mode!=='paid'){render(vLock('adv'),r);return;}
-  if(({depense:1,saisie:1,vente:1,bande:1})[r]&&st.mode==='expired'){render(vLock('ro'),r);return;}
+  if(({depense:1,saisie:1,vente:1,bande:1,oeufs:1})[r]&&st.mode==='expired'){render(vLock('ro'),r);return;}
   if(!db.bandes.length&&r!=='bande'){location.replace('#/bande/new');return;}
-  var views={accueil:vHome,depenses:vDep,depense:function(){return vDepForm(arg);},stock:vStock,saisie:vSaisie,ventes:vVentes,vente:function(){return vVenteForm(arg);},bandes:vBandes,bande:vBandeForm,valider:vValider,employes:vEmployes,commandes:vCommandes,activite:vActivite,bilan:function(){return vBilan(arg);},dettes:vDettes,climat:vClimat,simulateur:vSim,abo:vAbo};
+  var views={accueil:vHome,depenses:vDep,depense:function(){return vDepForm(arg);},stock:vStock,saisie:vSaisie,ventes:vVentes,vente:function(){return vVenteForm(arg);},bandes:vBandes,bande:vBandeForm,valider:vValider,employes:vEmployes,commandes:vCommandes,activite:vActivite,bilan:function(){return vBilan(arg);},oeufs:vOeufs,dettes:vDettes,climat:vClimat,simulateur:vSim,abo:vAbo};
   render((views[r]||vHome)(),r);
 }
 app.addEventListener('click',function(e){
@@ -1407,7 +1538,7 @@ app.addEventListener('click',function(e){
   if(db2){var id=db2.dataset.delb;if(confirm('Supprimer cette vague et toutes ses données (dépenses, mortalité, ventes) ?')){
     db.depenses.filter(function(x){return x.b===id&&x.stk;}).forEach(function(x){applyStk(x.stk,-1);});
     db.bandes=db.bandes.filter(function(x){return x.id!==id;});
-    ['depenses','morts','distrib','ventes'].forEach(function(k){db[k]=db[k].filter(function(x){return x.b!==id;});});
+    ['depenses','morts','distrib','ventes','oeufs'].forEach(function(k){db[k]=(db[k]||[]).filter(function(x){return x.b!==id;});});
     if(db.cur===id){db.cur=null;}save();route();}return;}
   if(t.closest('[data-export]')){
     if(window.AndroidBridge&&window.AndroidBridge.shareFile){window.AndroidBridge.shareFile('poulebox-sauvegarde-'+todayISO()+'.json',JSON.stringify(db));toast('Choisissez où enregistrer la sauvegarde');return;}
@@ -1423,7 +1554,7 @@ app.addEventListener('change',function(e){
     rd.readAsText(e.target.files[0]);
   }
 });
-/* ---------- Prix du jour (fixé par le propriétaire) ---------- */
+/* ---------- Prix du jour (fixé par le promoteur) ---------- */
 function fbOn(){return !!(cfg.fb&&cfg.fb.proj&&cfg.fb.key&&canAdv());}
 function prixStatus(){
   var p=db.prix;if(!p||!p.v){return 'Aucun prix défini.';}
@@ -1436,7 +1567,7 @@ function prixCard(){
   '<div class="sm" id="prixSt" style="margin-top:8px">'+prixStatus()+'</div></div>';
 }
 var pubing=false;
-function statPending(){var p=db.prix,st=db.stat;return !!((p&&p.v&&!(p.pub>=p.ts))||(st&&(!(st.pub>=st.ts)||st.dispoPub!==st.dispo)));}
+function statPending(){var p=db.prix,st=db.stat;return !!((db.bandes.length&&db.typesPub!==typesNow())||(p&&p.v&&!(p.pub>=p.ts))||(st&&(!(st.pub>=st.ts)||st.dispoPub!==st.dispo)));}
 async function publishState(silent){
   var p=db.prix,st=db.stat;
   if(pubing||!fbOn()||!statPending()){return false;}
@@ -1444,12 +1575,13 @@ async function publishState(silent){
   try{
     var tk=await ownerToken(),o={ts:Date.now()};
     if(p&&p.v){o.prix=p.v;o.prixTs=p.ts;}
+    var tn=db.bandes.length?typesNow():'';if(tn){o.types=tn;}
     if(st){o.statut=STKEY[st.s]||'croissance';o.cmd=st.cmd?1:0;o.msg=st.msg||'';o.dispo=st.showDispo?(st.dispo||0):0;o.statTs=st.ts;}
     var qs=Object.keys(o).concat(o.msg===''?[]:[]).map(function(k){return 'updateMask.fieldPaths='+k;}).join('&');
     var r=await fetchT(fsBase(cfg.fb.proj)+'/pub/state?'+qs+'&key='+encodeURIComponent(cfg.fb.key),
       {method:'PATCH',headers:{'Content-Type':'application/json','Authorization':'Bearer '+tk},body:JSON.stringify(toFs(o))});
     var er=r.ok?'':(r.status===403?'Envoi refusé : mettez à jour les règles Firebase':'Erreur du serveur ('+r.status+')');
-    if(r.ok){ok=true;var now=Date.now();if(p){p.pub=now;delete p.err;}if(st){st.pub=now;st.dispoPub=st.dispo;delete st.err;}}
+    if(r.ok){ok=true;var now=Date.now();if(tn){db.typesPub=tn;}if(p){p.pub=now;delete p.err;}if(st){st.pub=now;st.dispoPub=st.dispo;delete st.err;}}
     else{if(p){p.err=er;}if(st){st.err=er;}}
   }catch(e){if(!silent){var m=errMsg(e);if(p){p.err=m;}if(st){st.err=m;}}}
   finally{pubing=false;}
@@ -1469,7 +1601,7 @@ function bindPrix(){
   };
 }
 function wPrix(){var s=cfg.state;return (s&&s.prix>0)?s.prix:0;}
-function wPrixNote(){var s=cfg.state;return s&&s.prix>0?'Prix fixé par le propriétaire · mis à jour le '+fdl(s.prixTs||s.got):'';}
+function wPrixNote(){var s=cfg.state;return s&&s.prix>0?'Prix fixé par le promoteur · mis à jour le '+fdl(s.prixTs||s.got):'';}
 var STLBL={croissance:'En croissance',bientot:'Bientôt prêts',pret:'Prêts à la vente'};
 function setNotice(t){cfg.notice={t:t,ts:Date.now()};saveCfg();try{if(window.AndroidBridge&&window.AndroidBridge.notify){window.AndroidBridge.notify('Mon Poulailler',t);}}catch(e){}}
 async function workerPull(){
@@ -1477,9 +1609,10 @@ async function workerPull(){
   try{
     var r=await fetchT(fsBase(cfg.worker.proj)+'/pub/state?key='+encodeURIComponent(cfg.worker.key),{},12000);
     if(r.status===404){return false;}
-    if(!r.ok){cfg.pullErr=r.status===403?'Le prix n\'est pas encore disponible : le propriétaire doit mettre à jour la configuration':'Erreur du serveur ('+r.status+')';saveCfg();return false;}
+    if(!r.ok){cfg.pullErr=r.status===403?'Le prix n\'est pas encore disponible : le promoteur doit mettre à jour la configuration':'Erreur du serveur ('+r.status+')';saveCfg();return false;}
     var j=await r.json(),s=fromFs(j.fields),old=cfg.state||{},ch=false;
-    var n={prix:old.prix||0,prixTs:old.prixTs||0,got:Date.now(),statut:old.statut,cmd:old.cmd,msg:old.msg,dispo:old.dispo,statTs:old.statTs};
+    var n={types:old.types,prix:old.prix||0,prixTs:old.prixTs||0,got:Date.now(),statut:old.statut,cmd:old.cmd,msg:old.msg,dispo:old.dispo,statTs:old.statTs};
+    if(s.types){n.types=String(s.types);if(old.types!==n.types){ch=true;}}
     if(s.prix>0&&s.prix<1e7){n.prix=s.prix;n.prixTs=s.prixTs||0;if(old.prix!==n.prix||old.prixTs!==n.prixTs){ch=true;}}
     if(s.statTs){
       n.statut=s.statut;n.cmd=s.cmd?1:0;n.msg=s.msg||'';n.dispo=s.dispo||0;n.statTs=s.statTs;
@@ -1543,7 +1676,7 @@ function bindStat(){
 /* ---------- Centre : mises à jour + comptage des appareils ---------- */
 var CENTER={proj:'poulebox',key:'AIzaSyDaAkRRkGchPMrBw6oVKb4fhSFb2qptuWM'};
 function cenOn(){return !!(CENTER.proj&&CENTER.key);}
-var WEBVER='3.4 web';
+var WEBVER='3.5 web';
 function isWeb(){return !(window.AndroidBridge&&window.AndroidBridge.appInfo);}
 function appInfo(){if(isWeb()){return {name:WEBVER,code:999999};}try{var s=window.AndroidBridge&&window.AndroidBridge.appInfo&&window.AndroidBridge.appInfo();if(s){var a=String(s).split('|');return {name:a[0],code:parseInt(a[1],10)||0};}}catch(e){}return null;}
 function devId(){if(isWeb()){return normDev(getDev());}try{return String((window.AndroidBridge&&window.AndroidBridge.deviceId&&window.AndroidBridge.deviceId())||'').replace(/[^A-Z0-9]/g,'');}catch(e){return '';}}
@@ -1614,7 +1747,7 @@ function cenBind(){
   var b=$('#cenBtn');if(!b){return;}
   b.onclick=async function(){
     var el=$('#cenRes');el.textContent='Chargement…';
-    try{var c=await cenCount(),v=Object.keys(c.ver).map(function(k){return k+' : '+c.ver[k];}).join(' · '),r=Object.keys(c.role).map(function(k){return (k==='owner'?'propriétaires':k==='worker'?'gérants':'non choisi')+' : '+c.role[k];}).join(' · ');
+    try{var c=await cenCount(),v=Object.keys(c.ver).map(function(k){return k+' : '+c.ver[k];}).join(' · '),r=Object.keys(c.role).map(function(k){return (k==='owner'?'promoteurs':k==='worker'?'gérants':'non choisi')+' : '+c.role[k];}).join(' · ');
       el.innerHTML='<div class="big" style="color:var(--green)">'+c.total+' <small>appareil'+(c.total>1?'s':'')+' en tout</small></div><div style="margin-top:6px">Actifs ces 7 jours : <b>'+c.a7+'</b> · ces 30 jours : <b>'+c.a30+'</b></div><div style="margin-top:4px">'+esc(r)+'</div><div style="margin-top:4px">Versions : '+esc(v)+'</div>';
     }catch(e){el.textContent=errMsg(e);}
   };
@@ -1684,7 +1817,7 @@ function sharePdf(title,txt,fname){
 }
 
 /* ---------- Dettes ---------- */
-var PROP='Propriétaire';
+var PROP='Promoteur';
 function saleParts(v){
   var tot=+v.total||0,rec=+v.recu||0,rest=Math.max(0,tot-rec);
   var decl=(v.decl!=null)?(+v.decl||0):rec;
@@ -1797,7 +1930,7 @@ async function workerPullDebt(){
   try{
     var r=await fetchT(fsBase(cfg.worker.proj)+'/g/'+encodeURIComponent(cfg.worker.tok)+'?key='+encodeURIComponent(cfg.worker.key),{},12000);
     if(r.status===404){var h0=!cfg.mydebt;cfg.mydebt={total:0,lines:[],got:Date.now(),none:1};saveCfg();return h0;}
-    if(!r.ok){cfg.mydebtErr=r.status===403?'Données non disponibles : le propriétaire doit mettre à jour la configuration':'Erreur du serveur ('+r.status+')';saveCfg();return false;}
+    if(!r.ok){cfg.mydebtErr=r.status===403?'Données non disponibles : le promoteur doit mettre à jour la configuration':'Erreur du serveur ('+r.status+')';saveCfg();return false;}
     var j=await r.json(),s=fromFs(j.fields),ls=[];
     try{ls=JSON.parse(s.lines||'[]');}catch(e){}
     var dm={};try{JSON.parse(s.dec||'[]').forEach(function(x){dm[x[0]]=x[1];});}catch(e){}
@@ -1815,7 +1948,7 @@ function vWDettes(){
   function body(){
     var d=cfg.mydebt,ls=(d&&d.lines)||[];
     return '<div class="card" style="text-align:center"><div class="sm">Total que vous devez justifier</div><div class="big" style="font-size:34px;margin:4px 0;color:'+((d&&d.total>0)?'var(--red)':'var(--green)')+'">'+fmt(d?d.total:0)+' <small>FCFA</small></div><div class="sm">'+(d&&d.got?'Mis à jour à '+hm(d.got):(cfg.mydebtErr?esc(cfg.mydebtErr):'Pas encore reçu'))+'</div></div>'+
-    (!cfg.worker.tok?'<div class="box redbox" style="margin-bottom:12px"><b>Demandez un nouveau code au propriétaire</b><div class="sm" style="color:var(--redDk)">Votre code actuel ne permet pas de voir vos dettes.</div></div>':'')+
+    (!cfg.worker.tok?'<div class="box redbox" style="margin-bottom:12px"><b>Demandez un nouveau code au promoteur</b><div class="sm" style="color:var(--redDk)">Votre code actuel ne permet pas de voir vos dettes.</div></div>':'')+
     (ls.length?ls.map(function(l){return '<div class="item"><div class="main"><div class="t">'+esc(l[2])+'</div><div class="d">'+fd(l[1])+' · '+(l[0]==='e'?'Écart de caisse':'Crédit client')+'</div></div><div class="r"><b>'+fmt(l[3])+'</b></div></div>';}).join(''):'<div class="empty">Aucune dette.</div>')+
     '<button class="btn" type="button" id="wdImg" style="margin-top:12px">Enregistrer en image</button>';
   }
