@@ -45,6 +45,26 @@ textarea.in{height:auto;padding:12px;resize:none}
 .big{font-size:22px;font-weight:700;letter-spacing:-.02em}.big small{font-size:13px;font-weight:500;color:var(--mut)}
 .h2{font-size:16px;font-weight:700;margin:0 0 8px}
 .line{display:flex;justify-content:space-between;padding:6px 0;font-size:14px}
+.hero2{background:var(--green);color:#fff;border-radius:22px;padding:18px;margin-bottom:14px;box-shadow:0 6px 18px rgba(31,74,43,.18)}
+.hero2 .hrow{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.hero2 .hl{font-size:12px;opacity:.85;letter-spacing:.06em;text-transform:uppercase}
+.hero2 .hn{font-size:56px;font-weight:800;line-height:1.05;color:var(--yel)}
+.hero2 .hs{font-size:12px;opacity:.85}
+.hero2 .ring{width:92px;height:92px;flex:none;box-sizing:border-box;border-radius:50%;border:8px solid var(--yel);display:flex;align-items:center;justify-content:center;flex-direction:column}
+.hero2 .ring b{font-size:18px}.hero2 .ring span{font-size:10px;opacity:.85}
+.hero2 .hk{display:flex;gap:8px;border-top:1px solid rgba(255,255,255,.22);margin-top:14px;padding-top:12px}
+.hero2 .hk>div{flex:1;min-width:0}.hero2 .hk i{display:block;font-style:normal;font-size:11px;opacity:.85}.hero2 .hk b{font-size:15px;font-weight:700}
+.hero2 .hm{font-size:12px;opacity:.9;margin-top:10px}
+.btn2{display:flex;align-items:center;justify-content:center;height:54px;border-radius:16px;background:var(--yel);color:#1E2B20;font-size:17px;font-weight:700;text-decoration:none;box-shadow:0 2px 0 #D99A12;margin-bottom:12px}
+.hchips{margin-bottom:10px}.hchips a.chip{display:inline-flex;align-items:center;text-decoration:none;white-space:nowrap;font-weight:600}
+.mrow .chip{flex:none;white-space:nowrap}.mrow{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:6px 0}.mv{font-weight:700;font-size:18px}.mv2{font-weight:600;font-size:14px}
+.two{display:flex;gap:10px;margin-bottom:14px}.two>*{flex:1;min-width:0;border-radius:16px;padding:12px;box-sizing:border-box;text-decoration:none;color:inherit}
+.two .al{background:var(--yelBg);border:1px solid var(--yelB);cursor:pointer}.two .al b{display:block;font-size:12px;color:var(--yelDk)}.two .al span{font-size:12px;color:#6B5320}
+.two .al.ok{background:var(--greenBg);border-color:var(--greenB)}.two .al.ok b{color:var(--greenDk)}
+.two .tile{background:#fff;border:1px solid var(--greenB)}.two .tile b{display:block;font-weight:700;margin-top:2px}
+.hdr{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:14px}
+.hdr select{width:auto;max-width:165px;height:40px;border-radius:20px;font-weight:600;color:var(--green);font-size:13px}
+[hidden]{display:none!important}
 .chips{display:flex;flex-wrap:wrap;gap:8px}
 .chips.scroll{flex-wrap:nowrap;overflow-x:auto;padding-bottom:6px;margin-bottom:8px}
 .chips.scroll .chip{flex:none}
@@ -113,7 +133,7 @@ var NAV=[['accueil','Accueil','M4 11l8-7 8 7v9a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0
 ['ventes','Ventes','M4 17l5-5 4 4 7-8 M15 8h5v5'],
 ['valider','À valider','M22 12h-6l-2 3h-4l-2-3H2 M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z'],
 ['bandes','Vagues','M7 4h10a3 3 0 0 1 3 3v10a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3z M8 9h8 M8 13h8 M8 17h5']];
-var ACTIVE={accueil:'accueil',depenses:'depenses',depense:'depenses',stock:'stock',saisie:'stock',ventes:'ventes',vente:'ventes',bandes:'bandes',bande:'bandes',valider:'valider',employes:'accueil',commandes:'ventes',activite:'accueil',bilan:'accueil',securite:'accueil',dettes:'accueil',oeufs:'accueil'};
+var ACTIVE={accueil:'accueil',depenses:'depenses',depense:'depenses',stock:'stock',saisie:'stock',ventes:'ventes',vente:'ventes',bandes:'bandes',bande:'bandes',valider:'valider',employes:'accueil',commandes:'ventes',activite:'accueil',bilan:'accueil',securite:'accueil',dettes:'accueil',oeufs:'accueil',reglages:'accueil'};
 
 var app=document.getElementById('app');
 var db=load();
@@ -215,35 +235,53 @@ function applyStk(stk,sign){
 
 /* ---------- Accueil ---------- */
 function vHome(){
-  var b=curBande(),s=stats(b),alerts=[];
+  var b=curBande(),s=stats(b),alerts=[],P=isP(b);
   db.stock.forEach(function(i){if(i.qty<=i.seuil){alerts.push('Stock bas : '+esc(i.nom)+' ('+itemQty(i)+')');}});
   var resv=sum(db.commandes.filter(function(c){return c.b===b.id;}),'qty');
   if(resv>s.alive){alerts.push('Commandes en attente ('+resv+' poulets) supérieures aux poulets vivants ('+s.alive+')');}
   if(s.rate>5){alerts.push('Mortalité élevée : '+pct(s.rate)+' (au-dessus de 5 %)');}
-  if(isP(b)){var pi0=ponteInfo(b,s);if(pi0.drop){alerts.push('Baisse de ponte : '+fmt(pi0.last.n)+' œufs au lieu de '+fmt(pi0.prevAvg)+' en moyenne. Vérifiez eau, aliment, chaleur, stress.');}}
-  var html='<div class="screen"><div class="top"><div style="display:flex;align-items:center;gap:10px"><div class="logo" style="width:44px;height:44px">'+LOGO+'</div><h1 style="font-size:17px;white-space:nowrap">Mon Poulailler</h1></div>'+bsel()+'</div>'+
+  if(P){var pi0=ponteInfo(b,s);if(pi0.drop){alerts.push('Baisse de ponte : '+fmt(pi0.last.n)+' œufs au lieu de '+fmt(pi0.prevAvg)+' en moyenne. Vérifiez eau, aliment, chaleur, stress.');}}
+  var live=b.nb?Math.round(s.alive/b.nb*100):0,ls=licOn()?licState():null;
+  var sub=(ls&&ls.mode==='paid')?'<a href="#/licence" style="color:inherit;text-decoration:none">Version complète · '+ls.days+' jour'+s1(ls.days)+'</a>':'';
+  var lic=(ls&&ls.mode==='paid'&&ls.days>7)?'':licCard();
+  var loss=s.profit<0,p=db.prix||{},stt=db.stat;
+  var mk='';
+  if(typesNow()!=='ponte'){
+    mk='<div class="card"><div class="h2" style="color:var(--green)">Marché</div>'+
+    '<div class="mrow"><div><div class="sm">Prix du jour'+(fbOn()&&p.v?(p.pub>=p.ts?' <span style="color:var(--green);font-weight:600">✓ envoyé</span>':' <span class="mort">⏳</span>'):'')+'</div><div class="mv">'+(p.v?fmt(p.v)+' FCFA':'Non défini')+'</div></div><button class="chip sm" type="button" data-tg="mkp">Modifier</button></div>'+
+    '<div id="mkp" hidden>'+prixCard()+'</div><div style="height:1px;background:var(--pB);margin:6px 0"></div>'+
+    '<div class="mrow"><div><div class="sm">Statut des poulets</div><div class="mv2">'+(stt?esc(STATS[stt.s]||'')+' · '+(stt.cmd?'commandes ouvertes':'commandes fermées'):'Non défini')+'</div></div><button class="chip sm" type="button" data-tg="mks">Modifier</button></div>'+
+    '<div id="mks" hidden>'+statCard()+'</div></div>';
+  }
+  var tile='';
+  if(!P&&!b.fin){var ix=idealT(dayN(b));tile='<a class="tile" href="#/climat"><span class="sm">Température idéale</span><b>'+ix.lo+' à '+ix.hi+' °C</b></a>';}
+  var chip=function(h,t,c){return '<a class="chip" href="'+h+'"'+(c?' style="color:'+c+'"':'')+'>'+t+'</a>';};
+  var chips='<div class="chips scroll hchips">'+(P?chip('#/saisie','Saisie du jour'):'')+chip('#/depense/new','+ Dépense','var(--red)')+
+    (P?chip('#/vente/new-oeuf','+ Œufs vendus','var(--green)')+chip('#/vente/new-reforme','+ Réforme','var(--green)'):chip('#/vente/new','+ Vente','var(--green)'))+
+    chip('#/bilan','Bilan')+chip('#/dettes','Dettes')+(P?'':chip('#/simulateur','Simulateur')+chip('#/climat','Météo'))+chip('#/employes','Gérants')+chip('#/securite',pinOn()?'🔒 Verrouillage':'Verrouillage')+chip('#/reglages','Réglages')+'</div>';
+  var html='<div class="screen"><div class="hdr"><div style="display:flex;align-items:center;gap:10px;min-width:0"><div class="logo" style="width:40px;height:40px;box-shadow:0 0 0 2px var(--yel);border-radius:12px;flex:none">'+LOGO+'</div><div style="min-width:0"><div style="font-weight:700;font-size:17px;line-height:1.1">Mon Poulailler</div><div class="sm">'+sub+'</div></div></div>'+bsel()+'</div>'+
   (db.pending.length?'<a class="box" href="#/valider" style="display:block;text-decoration:none;margin-bottom:14px;background:var(--amberBg);color:var(--amber)"><b>'+db.pending.length+' saisie'+(db.pending.length>1?'s':'')+' des gérants à valider</b><div class="sm" style="color:var(--amber)">Touchez pour vérifier et valider</div></a>':'')+
-  updBox()+licCard()+'<div class="hero"><div><div class="s">Jour</div><div class="n">'+dayN(b)+'</div><div class="s">'+esc(b.nom)+(b.fin?' · terminée':'')+'</div></div>'+
-  '<div><div class="s">'+(isP(b)?'Pondeuses vivantes':'Poulets vivants')+'</div><div class="n">'+s.alive+'</div><div class="s">sur '+b.nb+' mis en place</div></div></div>'+
-  '<div class="box redbox" style="margin-bottom:14px;display:flex;justify-content:space-between;align-items:center"><b>Mortalité</b><span><b>'+s.dead+'</b> morts · <b>'+pct(s.rate)+'</b></span></div>'+
-  '<div class="grid3"><div class="kpi"><div class="sm">Dépenses</div><div class="v" style="color:var(--red)">'+fmt(s.depT)+'</div></div>'+
-  '<div class="kpi"><div class="sm">Ventes</div><div class="v">'+fmt(s.venT)+'</div></div>'+
-  '<div class="kpi"><div class="sm">'+(s.profit<0?'Perte':'Bénéfice')+'</div><div class="v" style="color:'+(s.profit<0?'var(--red)':'var(--green)')+'">'+fmt(Math.abs(s.profit))+'</div></div></div>'+
-  (isP(b)?ponteCard(b,s):'')+prixCard()+statCard()+(isP(b)?'':climCard())+
-  '<div class="card"><div class="h2">Alertes</div>'+(alerts.length?alerts.map(function(a){return '<div class="line"><span>⚠ '+a+'</span></div>';}).join(''):'<div class="sm">Aucune alerte pour le moment.</div>')+'</div>'+
-  (isP(b)?'<a class="btn" href="#/oeufs">Ramassage des œufs</a>':'')+
-  '<a class="btn'+(isP(b)?' alt':'')+'" href="#/saisie">Saisie du jour (mortalité, aliment)</a>'+
-  '<a class="btn red" href="#/depense/new">Ajouter une dépense</a>'+
-  (isP(b)?'<a class="btn alt" href="#/vente/new-oeuf">Vendre des œufs</a><a class="btn alt" href="#/vente/new-reforme">Vendre des poules (réforme)</a>':'<a class="btn alt" href="#/vente/new">Enregistrer une vente</a>')+
-  '<a class="btn alt" href="#/bilan">Bilan et bénéfices</a>'+
-  '<a class="btn alt" href="#/dettes">Dettes (par gérant)</a>'+
-  (isP(b)?'':'<a class="btn alt" href="#/simulateur">Simulateur de vague</a><a class="btn alt" href="#/climat">Température et météo</a>')+
+  updBox()+lic+
+  '<div class="hero2"><div class="hrow"><div><div class="hl">'+(P?'Pondeuses vivantes':'Poulets vivants')+'</div><div class="hn">'+s.alive+'</div><div class="hs">sur '+b.nb+' · jour '+dayN(b)+(b.fin?' · terminée':'')+'</div></div><div class="ring"><b>'+live+' %</b><span>survie</span></div></div>'+
+  '<div class="hk"><div><i>Dépenses</i><b>'+fmt(s.depT)+'</b></div><div><i>Ventes</i><b>'+fmt(s.venT)+'</b></div><div><i>'+(loss?'Perte':'Bénéfice')+'</i><b style="color:'+(loss?'#FFB3A8':'#fff')+'">'+fmt(Math.abs(s.profit))+'</b></div></div>'+
+  '<div class="hm">Mortalité : <b>'+s.dead+'</b> mort'+(s.dead>1?'s':'')+' · <b>'+pct(s.rate)+'</b></div></div>'+
+  (P?ponteCard(b,s):'')+
+  (P?'<a class="btn2" href="#/oeufs">Ramassage des œufs</a>':'<a class="btn2" href="#/saisie">Saisie du jour</a>')+chips+mk+
+  '<div class="two"><div class="al'+(alerts.length?'':' ok')+'" data-tg="alall"><b>'+(alerts.length?alerts.length+' alerte'+(alerts.length>1?'s':''):'Aucune alerte')+'</b><span>'+(alerts.length?alerts[0]:'Tout va bien')+'</span></div>'+tile+'</div>'+
+  '<div id="alall" hidden class="card"><div class="h2">Alertes</div>'+alerts.map(function(a){return '<div class="line"><span>⚠ '+a+'</span></div>';}).join('')+'</div></div>';
+  return {html:html,theme:'t-green',init:function(){bindBsel();bindPrix();bindStat();
+    app.querySelectorAll('[data-tg]').forEach(function(el){el.onclick=function(){var t=document.getElementById(el.dataset.tg);if(t){t.hidden=!t.hidden;}};});
+    refreshOwner(false);publishState(true);publishDebts();syncPoll();}};
+}
+function vReglages(){
+  var html='<div class="screen"><div class="ttl"><a class="back" href="#/accueil" aria-label="Retour">‹</a><h1>Réglages</h1></div>'+
   '<a class="btn alt" href="#/employes">Gérants et envoi automatique</a>'+
   '<a class="btn alt" href="#/securite">'+(pinOn()?'🔒 Code de verrouillage (activé)':'Code de verrouillage')+'</a>'+
+  '<a class="btn alt" href="#/licence">Ma licence</a>'+
   '<div class="card" style="margin-top:18px"><div class="h2">Sauvegarde</div><div class="sm" style="margin-bottom:10px">Vos données sont gardées sur ce téléphone. Faites une copie de temps en temps.</div>'+
   '<div class="row"><button class="btn alt sm" type="button" data-export="1">Exporter</button><button class="btn alt sm" type="button" data-import="1">Importer</button></div>'+
   '<input type="file" id="impfile" accept=".json,application/json" hidden></div></div>';
-  return {html:html,theme:'t-green',init:function(){bindBsel();bindPrix();bindStat();refreshOwner(false);publishState(true);publishDebts();syncPoll();}};
+  return {html:html,theme:'t-green'};
 }
 
 /* ---------- Dépenses ---------- */
@@ -529,6 +567,7 @@ function loadCfg(){try{var c=JSON.parse(localStorage.getItem(CFGKEY));if(c&&type
 function saveCfg(){try{localStorage.setItem(CFGKEY,JSON.stringify(cfg));}catch(e){}}
 var curRoute='accueil';
 var FS='https://firestore.googleapis.com/v1/projects/';
+function pre(o){return (o&&o.pre)||'';}
 function fsBase(p){return FS+encodeURIComponent(p)+'/databases/(default)/documents';}
 function toFs(o){var f={};Object.keys(o).forEach(function(k){var v=o[k];if(v===''||v==null){return;}
   if(typeof v==='number'){f[k]=Number.isInteger(v)?{integerValue:String(v)}:{doubleValue:v};}else{f[k]={stringValue:String(v)};}});return {fields:f};}
@@ -557,7 +596,7 @@ async function ownerSync(silent){
   if(!cfg.fb||!cfg.fb.proj||syncing||!canAdv()){return null;}
   syncing=true;
   try{
-    var tok=await ownerToken(),base=fsBase(cfg.fb.proj),docs=[],pt='',key=encodeURIComponent(cfg.fb.key);
+    var tok=await ownerToken(),base=fsBase(cfg.fb.proj)+pre(cfg.fb),docs=[],pt='',key=encodeURIComponent(cfg.fb.key);
     do{
       var r=await fetchT(base+'/reports?pageSize=100&key='+key+(pt?'&pageToken='+encodeURIComponent(pt):''),{headers:{Authorization:'Bearer '+tok}});
       var j=await r.json();
@@ -672,7 +711,8 @@ function vValider(){
 }
 function b64e(o){return btoa(unescape(encodeURIComponent(JSON.stringify(o))));}
 function b64d(x){return JSON.parse(decodeURIComponent(escape(atob(x))));}
-function codeFor(name){var f=cfg.fb||{};return 'PB1.'+b64e({p:f.proj,k:f.key,w:name,t:gTok(name)});}
+function codeFor(name){var f=cfg.fb||{},o={p:f.proj,k:f.key,w:name,t:gTok(name)};if(f.pre){o.b=f.pre.slice(5);}return 'PB1.'+b64e(o);}
+function preOf(d){return (d&&d.b&&/^[a-z0-9]{16,48}$/.test(String(d.b)))?'/box/'+d.b:'';}
 function copyText(txt){
   var ta=document.createElement('textarea');ta.value=txt;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.focus();ta.select();
   var ok=false;try{ok=document.execCommand('copy');}catch(e){}
@@ -680,12 +720,35 @@ function copyText(txt){
   if(!ok&&navigator.clipboard){navigator.clipboard.writeText(txt);ok=true;}
   return ok;
 }
+function rndA(n){var A='abcdefghijklmnopqrstuvwxyz0123456789',b=new Uint8Array(n),o='';try{crypto.getRandomValues(b);}catch(e){for(var i=0;i<n;i++){b[i]=Math.floor(Math.random()*256);}}for(var j=0;j<n;j++){o+=A.charAt(b[j]%36);}return o;}
+async function autoSetup(){
+  if(!cenOn()){throw new Error('Service indisponible dans cette version');}
+  var wk=rndA(24),pass=rndA(20),mail='p'+wk.slice(0,16)+'@poulebox.app';
+  var r=await fetchT('https://identitytoolkit.googleapis.com/v1/accounts:signUp?key='+encodeURIComponent(CENTER.key),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:mail,password:pass,returnSecureToken:true})},15000);
+  var j=await r.json();
+  if(!r.ok){var m=(j.error&&j.error.message)||'';throw new Error(/OPERATION_NOT_ALLOWED|ADMIN_ONLY/.test(m)?'Activation indisponible pour le moment. Contactez le vendeur.':('Activation impossible ('+m+')'));}
+  var r2=await fetchT(fsBase(CENTER.proj)+'/box?documentId='+wk+'&key='+encodeURIComponent(CENTER.key),{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+j.idToken},body:JSON.stringify(toFs({owner:j.localId,ts:Date.now()}))},15000);
+  if(!r2.ok){throw new Error(r2.status===403?'Activation refusée : le vendeur doit mettre à jour les règles du serveur':'Activation impossible ('+r2.status+')');}
+  cfg.fb={proj:CENTER.proj,key:CENTER.key,mail:mail,pass:pass,pre:'/box/'+wk,auto:1};
+  cfg.gpub={};cfg.syncErr='';delete db.typesPub;if(db.prix){db.prix.pub=0;}if(db.stat){db.stat.pub=0;}save();saveCfg();
+}
+function rescueCode(){var f=cfg.fb||{};return 'PR1.'+b64e({m:f.mail,p:f.pass,b:(f.pre||'').slice(5)});}
+function connTop(){
+  var f=cfg.fb||{};
+  if(f.auto){return '<div class="card"><div class="h2">1. Envoi automatique</div><div class="box" style="margin-bottom:10px"><b>✓ Activé</b><div class="sm" style="color:var(--pDk)">'+(cfg.syncErr?'<span class="mort">'+esc(cfg.syncErr)+'</span>':(cfg.lastSync?'Connecté · '+hm(cfg.lastSync):'Prêt'))+'</div></div>'+
+    '<div class="sm" style="margin-bottom:8px"><b>Code de secours</b> : gardez-le (message à vous-même). Il permet de retrouver vos gérants si vous changez de téléphone.</div>'+
+    '<div class="row"><button class="btn alt sm" type="button" id="autoCopy" style="margin:0">Copier le code de secours</button><button class="btn danger sm" type="button" id="autoOff" style="margin:0">Désactiver</button></div></div>';}
+  if(f.proj){return '';}
+  return '<div class="card"><div class="h2">1. Connecter vos gérants</div><div class="sm" style="margin-bottom:12px">Un seul bouton : aucune configuration, aucun compte à créer.</div><button class="btn" type="button" id="autoGo">Activer l\'envoi automatique</button>'+
+    '<div class="fld" style="margin-top:14px"><label class="l" for="f_resc">J\'ai déjà un code de secours</label><input class="in" id="f_resc" type="text" autocapitalize="none" autocomplete="off" placeholder="PR1...."></div><button class="btn alt sm" type="button" id="autoRestore">Restaurer</button>'+
+    '<div style="margin-top:12px"><button class="chip sm" type="button" id="advTog">Avancé : utiliser ma propre base Firebase</button></div></div>';
+}
 function vEmployes(){
   var f=cfg.fb||{},ger=cfg.gerants||[],ready=!!(f.proj&&f.key);
   var html='<div class="screen"><div class="ttl"><a class="back" href="#/accueil" aria-label="Retour">‹</a><h1>Gérants</h1></div>'+
   '<div class="sm" style="margin-bottom:14px">Vos gérants envoient leurs ventes, mortalités et commandes par internet. Vous les validez dans l\'onglet « À valider ».</div>'+
   '<a class="btn alt" href="#/activite">Voir l\'activité de chaque gérant</a>'+
-  '<div class="card"><div class="h2">1. Votre base en ligne (Firebase)</div>'+
+  connTop()+'<div class="card" id="advcard"'+(((cfg.fb||{}).auto||!(cfg.fb||{}).proj)?' style="display:none"':'')+'><div class="h2">Votre base en ligne (Firebase)</div>'+
   '<div class="fld"><label class="l" for="f_proj">ID du projet</label><input class="in" id="f_proj" type="text" autocapitalize="none" autocomplete="off" value="'+esc(f.proj||'')+'" placeholder="ex. poulebox-ab123"></div>'+
   '<div class="fld"><label class="l" for="f_key">Clé API (apiKey)</label><input class="in" id="f_key" type="text" autocapitalize="none" autocomplete="off" value="'+esc(f.key||'')+'" placeholder="AIza..."></div>'+
   '<div class="fld"><label class="l" for="f_mail">Votre e-mail Firebase</label><input class="in" id="f_mail" type="email" autocapitalize="none" value="'+esc(f.mail||'')+'"></div>'+
@@ -694,10 +757,22 @@ function vEmployes(){
   (cfg.syncErr?'<div class="sm mort">'+esc(cfg.syncErr)+'</div>':(cfg.lastSync?'<div class="sm" style="color:var(--greenDk)">✓ Connecté · '+hm(cfg.lastSync)+'</div>':''))+'</div>'+
   (ready?'<div class="card"><div class="h2">2. Vos gérants</div><div class="sm" style="margin-bottom:10px">Ajoutez chaque gérant avec son prénom. Donnez-lui son code personnel : son nom apparaîtra sur tout ce qu\'il envoie.</div>'+
     '<div class="row fld" style="align-items:flex-end"><div style="flex:2"><label class="l" for="f_gname">Prénom du gérant</label><input class="in" id="f_gname" type="text" placeholder="ex. Awa"></div><div><button class="btn sm" type="button" data-gadd="1" style="margin:0">Ajouter</button></div></div>'+
-    (ger.length?ger.map(function(g){var c=codeFor(g);return '<div style="border-top:1px solid var(--pB);padding:12px 0"><b>'+esc(g)+'</b><div class="row" style="margin-top:8px"><button class="btn alt sm" type="button" data-gshare="'+esc(g)+'" style="margin:0">Inviter (code court)</button><button class="btn alt sm" type="button" data-gcopy="'+esc(g)+'" style="margin:0">Copier</button><button class="btn danger sm" type="button" data-gdel="'+esc(g)+'" style="margin:0">Retirer</button></div><details style="margin-top:8px"><summary class="sm">Voir le code</summary><textarea class="in" rows="3" readonly>'+esc(c)+'</textarea></details></div>';}).join(''):'<div class="sm">Aucun gérant pour le moment.</div>')+
+    (ger.length?ger.map(function(g){var c=codeFor(g);return '<div style="border-top:1px solid var(--pB);padding:12px 0"><b>'+esc(g)+'</b><div class="row" style="margin-top:8px"><button class="btn alt sm" type="button" data-gshare="'+esc(g)+'" style="margin:0">Inviter</button><button class="btn alt sm" type="button" data-gcopy="'+esc(g)+'" style="margin:0">Copier</button><button class="btn danger sm" type="button" data-gdel="'+esc(g)+'" style="margin:0">Retirer</button></div><details style="margin-top:8px"><summary class="sm">Voir le code</summary><textarea class="in" rows="3" readonly>'+esc(c)+'</textarea></details></div>';}).join(''):'<div class="sm">Aucun gérant pour le moment.</div>')+
     '<div class="sm" style="margin-top:10px">Chaque gérant installe Mon Poulailler sur son téléphone, choisit « Je suis un gérant » et tape son code court (ou colle son long code).</div></div>'+orderCard():'')+'</div>';
   return {html:html,theme:'t-green',init:function(){
     orderBind();
+    var ag=$('#autoGo');if(ag){ag.onclick=async function(){
+      ag.disabled=true;toast('Activation…');
+      try{await autoSetup();toast('Envoi automatique activé ✓');publishState(true);publishDebts();syncPoll();route();}
+      catch(e){toast(errMsg(e));ag.disabled=false;}};}
+    var ar=$('#autoRestore');if(ar){ar.onclick=function(){
+      var c=$('#f_resc').value.replace(/\s/g,''),o=null;try{if(/^PR1\./.test(c)){o=b64d(c.slice(4));}}catch(e){}
+      if(!o||!o.m||!o.p||!/^[a-z0-9]{16,48}$/.test(String(o.b||''))){toast('Code de secours invalide');return;}
+      cfg.fb={proj:CENTER.proj,key:CENTER.key,mail:String(o.m),pass:String(o.p),pre:'/box/'+o.b,auto:1};cfg.syncErr='';saveCfg();toast('Vérification…');
+      ownerSync(false).then(function(a){if(a===null){cfg.fb=null;saveCfg();}else{toast('Restauré ✓');syncPoll();}route();});};}
+    var at=$('#advTog');if(at){at.onclick=function(){var c=$('#advcard');c.style.display=c.style.display==='none'?'':'none';};}
+    var ac=$('#autoCopy');if(ac){ac.onclick=function(){toast(copyText(rescueCode())?'Code de secours copié':'Copie impossible');};}
+    var ao=$('#autoOff');if(ao){ao.onclick=function(){if(confirm('Désactiver l\'envoi automatique ? Vos gérants ne pourront plus envoyer, sauf si vous avez le code de secours.')){cfg.fb=null;cfg.gpub={};saveCfg();route();}};}
     $('#savefb').onclick=function(){
       var p=$('#f_proj').value.trim(),k=$('#f_key').value.trim(),m=$('#f_mail').value.trim(),w=$('#f_pass').value;
       if(!p||!k||!m||!w){toast('Remplissez les 4 champs');return;}
@@ -798,7 +873,7 @@ async function workerFlush(silent){
   try{
     for(var i=0;i<q.length;i++){
       var it=q[i];
-      var r=await fetchT(fsBase(cfg.worker.proj)+'/reports?documentId='+encodeURIComponent(it.id)+'&key='+encodeURIComponent(cfg.worker.key),
+      var r=await fetchT(fsBase(cfg.worker.proj)+pre(cfg.worker)+'/reports?documentId='+encodeURIComponent(it.id)+'&key='+encodeURIComponent(cfg.worker.key),
         {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(toFs(it.data))});
       if(r.ok||r.status===409){it.sent=true;it.sentAt=Date.now();n++;saveCfg();}
       else{fail=r.status===403?"Envoi refusé : le promoteur doit vérifier la configuration":'Erreur du serveur ('+r.status+')';break;}
@@ -828,14 +903,14 @@ function vWSetup(){
     '<button class="btn alt" type="button" data-role="">Retour</button></form></div>',theme:'t-green',init:function(){
     $('#short').onclick=async function(){
       var b=this;b.disabled=true;
-      try{var d=await invUse($('#f_short').value);cfg.worker={proj:String(d.p),key:String(d.k),who:String(d.w).slice(0,40),tok:d.t?String(d.t):''};saveCfg();toast('Bienvenue '+cfg.worker.who);location.hash='#/accueil';route();}
+      try{var d=await invUse($('#f_short').value);cfg.worker={proj:String(d.p),key:String(d.k),who:String(d.w).slice(0,40),tok:d.t?String(d.t):'',pre:preOf(d)};saveCfg();toast('Bienvenue '+cfg.worker.who);location.hash='#/accueil';route();}
       catch(e){toast(errMsg(e));b.disabled=false;}
     };
     $('#save').onclick=function(){
       var code=$('#f_code').value.replace(/\s/g,''),o=null;
       try{if(/^PB1\./.test(code)){o=b64d(code.slice(4));}}catch(e){}
       if(!o||!o.p||!o.k||!o.w){toast('Code invalide. Copiez-le en entier.');return;}
-      cfg.worker={proj:String(o.p),key:String(o.k),who:String(o.w).slice(0,40),tok:o.t?String(o.t):''};saveCfg();toast('Bienvenue '+cfg.worker.who);location.hash='#/accueil';route();
+      cfg.worker={proj:String(o.p),key:String(o.k),who:String(o.w).slice(0,40),tok:o.t?String(o.t):'',pre:preOf(o)};saveCfg();toast('Bienvenue '+cfg.worker.who);location.hash='#/accueil';route();
     };
   }};
 }
@@ -1390,7 +1465,7 @@ async function invUse(code){
   if(!d||!d.p||!d.k||!d.w){throw new Error('Code invalide');}
   return d;
 }
-function orderLink(){var f=cfg.fb||{};return ORDER_BASE+'?p='+encodeURIComponent(f.proj||'')+'&k='+encodeURIComponent(f.key||'')+(cfg.farm?'&n='+encodeURIComponent(cfg.farm):'');}
+function orderLink(){var f=cfg.fb||{};return ORDER_BASE+'?p='+encodeURIComponent(f.proj||'')+'&k='+encodeURIComponent(f.key||'')+(f.pre?'&b='+encodeURIComponent(f.pre.slice(5)):'')+(cfg.farm?'&n='+encodeURIComponent(cfg.farm):'');}
 function orderCard(){
   return '<div class="card"><div class="h2">3. Lien de commande pour vos clients</div><div class="sm" style="margin-bottom:10px">Vos clients ouvrent ce lien, voient votre prix du jour et envoient leur commande. Elle arrive dans « À valider ». Aucun paiement en ligne.</div>'+
   '<div class="fld"><label class="l" for="f_farm">Nom de votre ferme (affiché au client)</label><input class="in" id="f_farm" type="text" maxlength="40" value="'+esc(cfg.farm||'')+'" placeholder="ex. Ferme Traoré"></div>'+
@@ -1515,7 +1590,7 @@ function route(){
   if(({employes:1,valider:1,activite:1,commandes:1})[r]&&st.mode!=='paid'){render(vLock('adv'),r);return;}
   if(({depense:1,saisie:1,vente:1,bande:1,oeufs:1})[r]&&st.mode==='expired'){render(vLock('ro'),r);return;}
   if(!db.bandes.length&&r!=='bande'){location.replace('#/bande/new');return;}
-  var views={accueil:vHome,depenses:vDep,depense:function(){return vDepForm(arg);},stock:vStock,saisie:vSaisie,ventes:vVentes,vente:function(){return vVenteForm(arg);},bandes:vBandes,bande:vBandeForm,valider:vValider,employes:vEmployes,commandes:vCommandes,activite:vActivite,bilan:function(){return vBilan(arg);},oeufs:vOeufs,dettes:vDettes,climat:vClimat,simulateur:vSim,abo:vAbo};
+  var views={accueil:vHome,depenses:vDep,depense:function(){return vDepForm(arg);},stock:vStock,saisie:vSaisie,ventes:vVentes,vente:function(){return vVenteForm(arg);},bandes:vBandes,bande:vBandeForm,valider:vValider,employes:vEmployes,commandes:vCommandes,activite:vActivite,bilan:function(){return vBilan(arg);},oeufs:vOeufs,reglages:vReglages,dettes:vDettes,climat:vClimat,simulateur:vSim,abo:vAbo};
   render((views[r]||vHome)(),r);
 }
 app.addEventListener('click',function(e){
@@ -1578,7 +1653,7 @@ async function publishState(silent){
     var tn=db.bandes.length?typesNow():'';if(tn){o.types=tn;}
     if(st){o.statut=STKEY[st.s]||'croissance';o.cmd=st.cmd?1:0;o.msg=st.msg||'';o.dispo=st.showDispo?(st.dispo||0):0;o.statTs=st.ts;}
     var qs=Object.keys(o).concat(o.msg===''?[]:[]).map(function(k){return 'updateMask.fieldPaths='+k;}).join('&');
-    var r=await fetchT(fsBase(cfg.fb.proj)+'/pub/state?'+qs+'&key='+encodeURIComponent(cfg.fb.key),
+    var r=await fetchT(fsBase(cfg.fb.proj)+pre(cfg.fb)+'/pub/state?'+qs+'&key='+encodeURIComponent(cfg.fb.key),
       {method:'PATCH',headers:{'Content-Type':'application/json','Authorization':'Bearer '+tk},body:JSON.stringify(toFs(o))});
     var er=r.ok?'':(r.status===403?'Envoi refusé : mettez à jour les règles Firebase':'Erreur du serveur ('+r.status+')');
     if(r.ok){ok=true;var now=Date.now();if(tn){db.typesPub=tn;}if(p){p.pub=now;delete p.err;}if(st){st.pub=now;st.dispoPub=st.dispo;delete st.err;}}
@@ -1607,7 +1682,7 @@ function setNotice(t){cfg.notice={t:t,ts:Date.now()};saveCfg();try{if(window.And
 async function workerPull(){
   if(!cfg.worker){return false;}
   try{
-    var r=await fetchT(fsBase(cfg.worker.proj)+'/pub/state?key='+encodeURIComponent(cfg.worker.key),{},12000);
+    var r=await fetchT(fsBase(cfg.worker.proj)+pre(cfg.worker)+'/pub/state?key='+encodeURIComponent(cfg.worker.key),{},12000);
     if(r.status===404){return false;}
     if(!r.ok){cfg.pullErr=r.status===403?'Le prix n\'est pas encore disponible : le promoteur doit mettre à jour la configuration':'Erreur du serveur ('+r.status+')';saveCfg();return false;}
     var j=await r.json(),s=fromFs(j.fields),old=cfg.state||{},ch=false;
@@ -1676,7 +1751,7 @@ function bindStat(){
 /* ---------- Centre : mises à jour + comptage des appareils ---------- */
 var CENTER={proj:'poulebox',key:'AIzaSyDaAkRRkGchPMrBw6oVKb4fhSFb2qptuWM'};
 function cenOn(){return !!(CENTER.proj&&CENTER.key);}
-var WEBVER='3.5 web';
+var WEBVER='3.7 web';
 function isWeb(){return !(window.AndroidBridge&&window.AndroidBridge.appInfo);}
 function appInfo(){if(isWeb()){return {name:WEBVER,code:999999};}try{var s=window.AndroidBridge&&window.AndroidBridge.appInfo&&window.AndroidBridge.appInfo();if(s){var a=String(s).split('|');return {name:a[0],code:parseInt(a[1],10)||0};}}catch(e){}return null;}
 function devId(){if(isWeb()){return normDev(getDev());}try{return String((window.AndroidBridge&&window.AndroidBridge.deviceId&&window.AndroidBridge.deviceId())||'').replace(/[^A-Z0-9]/g,'');}catch(e){return '';}}
@@ -1715,7 +1790,7 @@ document.addEventListener('click',function(e){
 /* côté vendeur : publier une version, compter les utilisateurs */
 async function cenTok(){
   if(!cenOn()){throw new Error('Centre non configuré dans cette version');}
-  if(!cfg.fb||cfg.fb.proj!==CENTER.proj){throw new Error('Ce téléphone doit être connecté à votre base Firebase (Gérants et envoi automatique)');}
+  if(!cfg.fb||cfg.fb.proj!==CENTER.proj||cfg.fb.auto){throw new Error('Ce téléphone doit être connecté à votre base Firebase (Gérants et envoi automatique)');}
   return ownerToken();
 }
 async function cenPublish(v,name,url,notes){
@@ -1762,8 +1837,8 @@ function cenBind(){
 function syncPoll(){
   try{
     var B=window.AndroidBridge;if(!B||!B.setPoll){return;}
-    if(cfg.role==='owner'&&cfg.fb&&cfg.fb.proj&&cfg.fb.key&&cfg.fb.mail&&canAdv()){B.setPoll(JSON.stringify({role:'owner',proj:cfg.fb.proj,key:cfg.fb.key,mail:cfg.fb.mail,pass:cfg.fb.pass}));}
-    else if(cfg.role==='worker'&&cfg.worker){B.setPoll(JSON.stringify({role:'worker',proj:cfg.worker.proj,key:cfg.worker.key,tok:cfg.worker.tok||'',sTs:String((cfg.state&&cfg.state.statTs)||'')}));}
+    if(cfg.role==='owner'&&cfg.fb&&cfg.fb.proj&&cfg.fb.key&&cfg.fb.mail&&canAdv()){B.setPoll(JSON.stringify({role:'owner',proj:cfg.fb.proj,key:cfg.fb.key,mail:cfg.fb.mail,pass:cfg.fb.pass,pre:cfg.fb.pre||''}));}
+    else if(cfg.role==='worker'&&cfg.worker){B.setPoll(JSON.stringify({role:'worker',proj:cfg.worker.proj,key:cfg.worker.key,pre:cfg.worker.pre||'',tok:cfg.worker.tok||'',sTs:String((cfg.state&&cfg.state.statTs)||'')}));}
   }catch(e){}
 }
 /* ---------- Rapport PDF (sans bibliothèque) ---------- */
@@ -1916,7 +1991,7 @@ async function publishDebts(){
     for(var i=0;i<todo.length;i++){
       var t=todo[i],o=Object.assign({ts:Date.now()},t.o);
       var qs=Object.keys(o).map(function(k){return 'updateMask.fieldPaths='+k;}).join('&');
-      var r=await fetchT(fsBase(cfg.fb.proj)+'/g/'+gTok(t.n)+'?'+qs+'&key='+encodeURIComponent(cfg.fb.key),
+      var r=await fetchT(fsBase(cfg.fb.proj)+pre(cfg.fb)+'/g/'+gTok(t.n)+'?'+qs+'&key='+encodeURIComponent(cfg.fb.key),
         {method:'PATCH',headers:{'Content-Type':'application/json','Authorization':'Bearer '+tk},body:JSON.stringify(toFs(o))});
       if(r.ok){cfg.gpub[t.n]=t.h;any=true;saveCfg();}else{break;}
     }
@@ -1928,7 +2003,7 @@ async function publishDebts(){
 async function workerPullDebt(){
   if(!cfg.worker||!cfg.worker.tok){cfg.mydebt=null;return false;}
   try{
-    var r=await fetchT(fsBase(cfg.worker.proj)+'/g/'+encodeURIComponent(cfg.worker.tok)+'?key='+encodeURIComponent(cfg.worker.key),{},12000);
+    var r=await fetchT(fsBase(cfg.worker.proj)+pre(cfg.worker)+'/g/'+encodeURIComponent(cfg.worker.tok)+'?key='+encodeURIComponent(cfg.worker.key),{},12000);
     if(r.status===404){var h0=!cfg.mydebt;cfg.mydebt={total:0,lines:[],got:Date.now(),none:1};saveCfg();return h0;}
     if(!r.ok){cfg.mydebtErr=r.status===403?'Données non disponibles : le promoteur doit mettre à jour la configuration':'Erreur du serveur ('+r.status+')';saveCfg();return false;}
     var j=await r.json(),s=fromFs(j.fields),ls=[];

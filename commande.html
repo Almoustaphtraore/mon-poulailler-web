@@ -14,12 +14,12 @@ button{width:100%;margin-top:16px;height:52px;border:0;border-radius:12px;backgr
 <div class="w" id="app"><div class="box sm">Chargement…</div></div>
 <script>
 (function(){
-var q=new URLSearchParams(location.search),P=q.get('p')||'',K=q.get('k')||'',N=(q.get('n')||'').slice(0,40);
+var q=new URLSearchParams(location.search),P=q.get('p')||'',K=q.get('k')||'',B=/^[a-z0-9]{16,48}$/.test(q.get('b')||'')?'/box/'+q.get('b'):'',N=(q.get('n')||'').slice(0,40);
 var app=document.getElementById('app');if(N){document.getElementById('farm').textContent=N;document.title='Commander · '+N;}
 var STL={croissance:'Poulets en croissance',bientot:'Bientôt prêts',pret:'Prêts à la vente'};
 function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
 function fmt(n){return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g,' ');}
-function base(){return 'https://firestore.googleapis.com/v1/projects/'+encodeURIComponent(P)+'/databases/(default)/documents';}
+function base(){return 'https://firestore.googleapis.com/v1/projects/'+encodeURIComponent(P)+'/databases/(default)/documents'+B;}
 function fv(f,k){var v=f&&f[k];if(!v){return undefined;}return v.stringValue!==undefined?v.stringValue:v.integerValue!==undefined?Number(v.integerValue):v.doubleValue;}
 if(!P||!K){app.innerHTML='<div class="box no">Lien incomplet. Demandez le lien au vendeur.</div>';return;}
 fetch(base()+'/pub/state?key='+encodeURIComponent(K)).then(function(r){return r.ok?r.json():null;}).then(function(j){
