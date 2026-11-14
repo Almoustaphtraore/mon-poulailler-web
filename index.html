@@ -241,7 +241,7 @@ function vHome(){
   if(resv>s.alive){alerts.push('Commandes en attente ('+resv+' poulets) supérieures aux poulets vivants ('+s.alive+')');}
   if(s.rate>5){alerts.push('Mortalité élevée : '+pct(s.rate)+' (au-dessus de 5 %)');}
   if(P){var pi0=ponteInfo(b,s);if(pi0.drop){alerts.push('Baisse de ponte : '+fmt(pi0.last.n)+' œufs au lieu de '+fmt(pi0.prevAvg)+' en moyenne. Vérifiez eau, aliment, chaleur, stress.');}}
-  var live=b.nb?Math.round(s.alive/b.nb*100):0,ls=licOn()?licState():null;
+  var live=b.nb?Math.max(0,Math.round((b.nb-s.dead)/b.nb*100)):0,ls=licOn()?licState():null;
   var sub=(ls&&ls.mode==='paid')?'<a href="#/licence" style="color:inherit;text-decoration:none">Version complète · '+ls.days+' jour'+s1(ls.days)+'</a>':'';
   var lic=(ls&&ls.mode==='paid'&&ls.days>7)?'':licCard();
   var loss=s.profit<0,p=db.prix||{},stt=db.stat;
@@ -490,7 +490,7 @@ function vOeufs(){
   var b=curBande(),s=stats(b);
   if(!isP(b)){return {html:'<div class="screen"><div class="top"><h1>Ramassage des œufs</h1>'+bsel()+'</div><div class="box redbox"><b>Cette vague est une vague de poulets de chair.</b><div class="sm" style="color:var(--redDk)">Choisissez une vague de pondeuses ci-dessus, ou créez-en une dans « Vagues ».</div></div><a class="btn alt" href="#/bande/new">+ Nouvelle vague de pondeuses</a></div>',theme:'t-green',init:bindBsel};}
   var pi=ponteInfo(b,s),list=pi.list.slice(0,30);
-  var html='<div class="screen"><div class="top"><h1>Ramassage des œufs</h1>'+bsel()+'</div>'+
+  var html='<div class="screen"><div class="top"><h1>Les œufs</h1>'+bsel()+'</div>'+
   (pi.drop?'<div class="box redbox" style="margin-bottom:12px"><b>⚠ Baisse de ponte</b><div class="sm" style="color:var(--redDk)">'+fmt(pi.last.n)+' œufs au lieu de '+fmt(pi.prevAvg)+' en moyenne. Vérifiez l\'eau, l\'aliment, la chaleur et les maladies.</div></div>':'')+
   '<div class="card"><div class="row"><div><div class="sm">Taux de ponte (dernier jour)</div><div class="big" style="font-size:22px">'+pct(pi.rateLast)+'</div></div><div><div class="sm">Moyenne 7 jours</div><div class="big" style="font-size:22px">'+pct(pi.rate7)+'</div></div></div>'+
   '<div class="row" style="margin-top:10px"><div><div class="sm">Stock d\'œufs</div><b>'+plat(s.oStock)+'</b></div><div><div class="sm">Pondeuses vivantes</div><b>'+s.alive+'</b></div></div>'+
@@ -1608,13 +1608,13 @@ app.addEventListener('click',function(e){
     save();route();}return;}
   var pk=t.closest('[data-pick]');if(pk){db.cur=pk.dataset.pick;save();toast('Vague affichée');route();return;}
   var fi=t.closest('[data-fin]');
-  if(fi){var bb=db.bandes.filter(function(x){return x.id===fi.dataset.fin;})[0];if(bb.fin){delete bb.fin;}else{bb.fin=todayISO();}save();route();return;}
+  if(fi){var bb=db.bandes.filter(function(x){return x.id===fi.dataset.fin;})[0];if(bb.fin){delete bb.fin;}else{bb.fin=todayISO();}save();publishState(true);route();return;}
   var db2=t.closest('[data-delb]');
   if(db2){var id=db2.dataset.delb;if(confirm('Supprimer cette vague et toutes ses données (dépenses, mortalité, ventes) ?')){
     db.depenses.filter(function(x){return x.b===id&&x.stk;}).forEach(function(x){applyStk(x.stk,-1);});
     db.bandes=db.bandes.filter(function(x){return x.id!==id;});
     ['depenses','morts','distrib','ventes','oeufs'].forEach(function(k){db[k]=(db[k]||[]).filter(function(x){return x.b!==id;});});
-    if(db.cur===id){db.cur=null;}save();route();}return;}
+    if(db.cur===id){db.cur=null;}save();publishState(true);route();}return;}
   if(t.closest('[data-export]')){
     if(window.AndroidBridge&&window.AndroidBridge.shareFile){window.AndroidBridge.shareFile('poulebox-sauvegarde-'+todayISO()+'.json',JSON.stringify(db));toast('Choisissez où enregistrer la sauvegarde');return;}
     var blob=new Blob([JSON.stringify(db)],{type:'application/json'}),url=URL.createObjectURL(blob),l=document.createElement('a');
@@ -1751,7 +1751,7 @@ function bindStat(){
 /* ---------- Centre : mises à jour + comptage des appareils ---------- */
 var CENTER={proj:'poulebox',key:'AIzaSyDaAkRRkGchPMrBw6oVKb4fhSFb2qptuWM'};
 function cenOn(){return !!(CENTER.proj&&CENTER.key);}
-var WEBVER='3.7 web';
+var WEBVER='3.7.2 web';
 function isWeb(){return !(window.AndroidBridge&&window.AndroidBridge.appInfo);}
 function appInfo(){if(isWeb()){return {name:WEBVER,code:999999};}try{var s=window.AndroidBridge&&window.AndroidBridge.appInfo&&window.AndroidBridge.appInfo();if(s){var a=String(s).split('|');return {name:a[0],code:parseInt(a[1],10)||0};}}catch(e){}return null;}
 function devId(){if(isWeb()){return normDev(getDev());}try{return String((window.AndroidBridge&&window.AndroidBridge.deviceId&&window.AndroidBridge.deviceId())||'').replace(/[^A-Z0-9]/g,'');}catch(e){return '';}}
