@@ -113,6 +113,13 @@ nav svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.9;st
 .welcome p{color:var(--mut);font-size:14px;margin:4px 0 0}
 nav a{position:relative}
 .bdg{position:absolute;top:7px;left:calc(50% + 6px);min-width:17px;height:17px;padding:0 4px;box-sizing:border-box;border-radius:9px;background:#C62828;color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.rc{background:#fff;border:2px dashed var(--pDk,#2F6B3F);border-radius:14px;padding:18px;margin-bottom:14px}
+.rc .fn{font-weight:800;font-size:20px;text-align:center}.rc .ft{text-align:center;color:#5F5F5F;font-size:13px;margin-bottom:8px}
+.rc .rt{text-align:center;font-weight:800;letter-spacing:.04em;margin:10px 0 2px;color:var(--pDk,#2F6B3F)}.rc .rn{text-align:center;font-size:12px;color:#5F5F5F;margin-bottom:10px}
+.rc .ln{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-top:1px solid #eee;font-size:15px}.rc .ln b{text-align:right}
+.rc .cd{margin:12px 0 4px;text-align:center;background:#FFF6DC;border-radius:12px;padding:10px}.rc .cd .c{font-size:30px;font-weight:800;letter-spacing:.12em}
+.rc .st{margin-top:12px;text-align:center;font-weight:800;font-size:18px;padding:8px;border-radius:10px}
+.rc .st.ok{background:#E6F0E8;color:#1F4A2B}.rc .st.no{background:#FDECEC;color:#C62828}
 </style>
 </head>
 <body>
@@ -133,7 +140,7 @@ var NAV=[['accueil','Accueil','M4 11l8-7 8 7v9a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0
 ['ventes','Ventes','M4 17l5-5 4 4 7-8 M15 8h5v5'],
 ['valider','À valider','M22 12h-6l-2 3h-4l-2-3H2 M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z'],
 ['bandes','Vagues','M7 4h10a3 3 0 0 1 3 3v10a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3z M8 9h8 M8 13h8 M8 17h5']];
-var ACTIVE={accueil:'accueil',depenses:'depenses',depense:'depenses',stock:'stock',saisie:'stock',ventes:'ventes',vente:'ventes',bandes:'bandes',bande:'bandes',valider:'valider',employes:'accueil',commandes:'ventes',activite:'accueil',bilan:'accueil',securite:'accueil',dettes:'accueil',oeufs:'accueil',reglages:'accueil'};
+var ACTIVE={recu:'ventes',accueil:'accueil',depenses:'depenses',depense:'depenses',stock:'stock',saisie:'stock',ventes:'ventes',vente:'ventes',bandes:'bandes',bande:'bandes',valider:'valider',employes:'accueil',commandes:'ventes',activite:'accueil',bilan:'accueil',securite:'accueil',dettes:'accueil',oeufs:'accueil',reglages:'accueil'};
 
 var app=document.getElementById('app');
 var db=load();
@@ -461,7 +468,7 @@ function vVenteForm(id){
   '<div class="row fld"><div><label class="l" for="f_recu">Montant reçu</label><input class="in" id="f_recu" type="text" inputmode="decimal" value="'+esc(o?o.recu:'')+'" placeholder="Vide = payé en totalité"></div><div><div class="l">Reste à encaisser</div><div class="in" style="display:flex;align-items:center;font-weight:700" id="f_reste">0 FCFA</div></div></div>'+
   '<div class="fld"><label class="l" for="f_note">Note (facultatif)</label><textarea class="in" id="f_note" rows="2">'+esc(d.note)+'</textarea></div>'+
   '<button class="btn" type="button" id="save">Enregistrer la vente</button>'+
-  (o?'<button class="btn danger" type="button" id="del">Supprimer cette vente</button>':'')+'</form></div>';
+  (o?'<a class="btn alt" href="#/recu/'+esc(o.id)+'">Reçu pour le client</a><button class="btn danger" type="button" id="del">Supprimer cette vente</button>':'')+'</form></div>';
   return {html:html,theme:'t-green',init:function(){
     var calc=function(){
       var q=Math.floor(num($('#f_qty').value)),t=Math.round(q*num($('#f_pu').value)),rv=$('#f_recu').value.trim();
@@ -478,8 +485,9 @@ function vVenteForm(id){
       var v={id:o?o.id:uid(),ts:o?o.ts:Date.now(),b:b.id,who:(o?o.who:(cm?cm.who:''))||'',date:$('#f_date').value||todayISO(),client:$('#f_client').value.trim(),qty:c.q,pu:num($('#f_pu').value),total:c.t,poids:prod==='oeuf'?'':(num($('#f_poids').value)||''),pay:chipVal('pay'),recu:c.recu,note:$('#f_note').value.trim()};
       if(prod!=='poulet'){v.prod=prod;}else if(o&&o.prod){v.prod=o.prod;}
       if(o){db.ventes[db.ventes.indexOf(o)]=v;}else{db.ventes.push(v);}
-      if(cm){db.commandes=db.commandes.filter(function(x){return x!==cm;});}
-      save();toast('Vente enregistrée');location.hash='#/ventes';
+      if(cm){db.commandes=db.commandes.filter(function(x){return x!==cm;});pubOrder(cm,'done');}
+      save();toast('Vente enregistrée');
+      if(!o&&v.client&&confirm('Vente enregistrée. Envoyer un reçu au client ?')){location.hash='#/recu/'+v.id;}else{location.hash='#/ventes';}
     };
     if(o){$('#del').onclick=function(){if(confirm('Supprimer cette vente ?')){db.ventes=db.ventes.filter(function(x){return x.id!==o.id;});save();toast('Vente supprimée');location.hash='#/ventes';}};}
   }};
@@ -659,14 +667,19 @@ function validateReport(id,ok){
     }else if(p.type==='commande'){
       var ac=Math.max(0,Math.round(num(el?el.value:p.recu)));
       if(p.qty<=0){toast('Quantité invalide : rejetez cette saisie');return;}
-      db.commandes.push({id:id,ts:Date.now(),b:b.id,date:p.date,client:p.client,tel:p.tel||'',qty:p.qty,pu:p.pu,total:Math.round(p.qty*p.pu),recu:ac,pay:p.pay,livr:p.livr||'',who:p.who,note:p.note||''});
+      var nc={id:id,code:ocode(id),ts:Date.now(),b:b.id,date:p.date,client:p.client,tel:p.tel||'',qty:p.qty,pu:p.pu,total:Math.round(p.qty*p.pu),recu:ac,pay:p.pay,livr:p.livr||'',who:p.who,note:p.note||''};
+      db.commandes.push(nc);pubOrder(nc,'open');
     }else{
       var recu=Math.max(0,Math.round(num(el?el.value:p.recu)));
       if(p.qty<=0){toast('Quantité invalide : rejetez cette saisie');return;}
       if(!egg&&p.qty>s.alive){toast('Il ne reste que '+s.alive+' poulets vivants');return;}
+      var mc=/COMMANDE ([A-Z2-9]{4})-?([A-Z2-9]{4})/i.exec(p.note||''),cmo=null;
+      if(mc){var cc=(mc[1]+mc[2]).toUpperCase();cmo=db.commandes.filter(function(x){return orderCode(x)===cc;})[0]||null;
+        if(!cmo&&!confirm('Cette commande n\'est plus en attente (déjà livrée ou annulée). Valider quand même cette vente ?')){return;}}
       var nv={id:'r'+id,ts:Date.now(),b:b.id,date:p.date,client:p.client,qty:p.qty,pu:p.pu,total:Math.round(p.qty*p.pu),poids:'',pay:p.pay,recu:recu,decl:Math.max(0,Math.round(+p.recu||0)),who:p.who,note:p.note||''};
       if(egg){nv.prod='oeuf';}
       db.ventes.push(nv);
+      if(cmo){db.commandes=db.commandes.filter(function(x){return x!==cmo;});pubOrder(cmo,'done');}
     }
   }
   db.dec=db.dec||[];db.dec.push({id:id,who:p.who,ok:ok?1:0,ts:Date.now()});if(db.dec.length>400){db.dec=db.dec.slice(-300);}
@@ -813,7 +826,7 @@ function repLabel(d){
 function repDetail(d){
   if(d.type==='mort'){return ' · '+esc(d.cause);}
   if(d.type==='oeuf'){return d.casses>0?' · '+d.casses+' cassés':'';}
-  if(d.type==='commande'){return ' · '+esc(d.client||'Client')+' · '+(d.recu>0?'acompte '+fmt(d.recu):'sans argent');}
+  if(d.type==='commande'){return ' · '+esc(d.client||'Client')+' · '+(d.recu>0?'acompte '+fmt(d.recu):'sans argent')+' · code '+ocodeFmt(ocode(d.id));}
   return ' · '+esc(d.client||'Client')+' · '+fmt(d.qty*d.pu)+' FCFA';
 }
 function vWCmd(){
@@ -837,8 +850,8 @@ function vWCmd(){
       if(!(c.q>0)){toast('Saisissez le nombre de poulets');return;}
       if(!(pu>0)){toast('Prix du jour non reçu : connectez-vous à internet puis réessayez');return;}
       var recu=Math.max(0,Math.round(num($('#f_recu').value)));
-      queueReport({type:'commande',date:todayISO(),client:cl.slice(0,60),tel:$('#f_tel').value.trim().slice(0,30),qty:c.q,pu:pu,recu:recu,pay:chipVal('pay'),livr:$('#f_livr').value||'',note:$('#f_note').value.trim().slice(0,200)});
-      toast('Commande enregistrée, envoi en cours…');location.hash='#/accueil';
+var oid=queueReport({type:'commande',date:todayISO(),client:cl.slice(0,60),tel:$('#f_tel').value.trim().slice(0,30),qty:c.q,pu:pu,recu:recu,pay:chipVal('pay'),livr:$('#f_livr').value||'',note:$('#f_note').value.trim().slice(0,200)});
+      toast('Commande enregistrée, envoi en cours…');alert('Commande enregistrée.\n\nCode de commande : '+ocodeFmt(ocode(oid))+'\n\nDonnez ce code au client. Il sera valable dès que le promoteur aura confirmé la commande.');location.hash='#/accueil';
     };
   }};
 }
@@ -854,6 +867,8 @@ function vCommandes(){
     return '<div class="card"><div style="display:flex;justify-content:space-between;gap:8px"><b>'+esc(c.client||'Client')+'</b><span class="sm">'+(c.livr?'Livraison '+fd(c.livr):'Sans date')+'</span></div>'+
     (c.tel?'<div class="sm" style="margin-top:2px">Tél. '+esc(c.tel)+'</div>':'')+
     '<div class="box" style="margin:10px 0"><b>'+c.qty+' poulet'+(c.qty>1?'s':'')+' × '+fmt(c.pu)+' = '+fmt(c.total)+' FCFA</b><br><span class="sm">'+(c.recu>0?'Acompte reçu : '+fmt(c.recu)+' · reste '+fmt(reste):'Aucun argent reçu · reste '+fmt(reste))+'</span>'+(c.who?'<br><span class="sm">Prise par '+esc(c.who)+'</span>':'')+(c.note?'<br><span class="sm">'+esc(c.note)+'</span>':'')+'</div>'+
+    '<div class="box" style="margin:0 0 10px;background:#FFF6DC;text-align:center"><span class="sm">Code de commande</span><div style="font-size:24px;font-weight:800;letter-spacing:.1em">'+ocodeFmt(orderCode(c))+'</div></div>'+
+    '<a class="btn alt sm" href="#/recu/c_'+esc(c.id)+'" style="margin-bottom:8px">Code et reçu pour le client</a>'+
     '<div class="row"><a class="btn sm" href="#/vente/c_'+esc(c.id)+'">Livrer</a><button class="btn danger sm" type="button" data-cmdno="'+esc(c.id)+'">Annuler</button></div></div>';}).join(''):'<div class="empty">Aucune commande en attente.</div>')+'</div>';
   return {html:html,theme:'t-green'};
 }
@@ -863,7 +878,7 @@ function queueReport(data){
   cfg.queue.push({id:data.id,data:data,sent:false,at:Date.now()});
   var sent=cfg.queue.filter(function(x){return x.sent;});
   if(sent.length>30){var drop=sent.slice(0,sent.length-30);cfg.queue=cfg.queue.filter(function(x){return drop.indexOf(x)<0;});}
-  saveCfg();
+  saveCfg();return data.id;
 }
 var flushing=false;
 async function workerFlush(silent){
@@ -924,7 +939,7 @@ function vWHome(){
   (wT()==='chair'?'':'<a class="btn" href="#/woeuf" style="height:64px;font-size:18px">🥚 Ramassage des œufs</a><a class="btn'+(wT()==='both'?' alt':'')+'" href="#/woeufv" style="height:64px;font-size:18px">🥚 Vendre des œufs</a>')+
   (wT()==='ponte'?'':'<a class="btn" href="#/wvente" style="height:64px;font-size:18px">Enregistrer une vente</a>')+
   (wT()==='ponte'?'':((cfg.state&&cfg.state.statTs&&!cfg.state.cmd)?'<div class="btn alt" style="height:64px;font-size:18px;opacity:.55">Commandes fermées</div>':'<a class="btn alt" href="#/wcmd" style="height:64px;font-size:18px">Prendre une commande</a>'))+
-  '<a class="btn alt" href="#/wdettes">Mes dettes</a>'+
+  '<a class="btn alt" href="#/wcode">🔎 Retrouver une commande (code)</a>'+'<a class="btn alt" href="#/wdettes">Mes dettes</a>'+
   (q.length?'<button class="btn alt" type="button" data-wflush="1">Envoyer maintenant</button>':'')+
   '<div class="sm" style="margin:6px 0 16px">Le promoteur vérifie puis valide chaque saisie.</div>'+
   '<h2 class="h2">Mes dernières saisies</h2>'+
@@ -975,11 +990,12 @@ function vWOeuf(){
   }};
 }
 function vWVente(prod){
-  var E=prod==='oeuf';
-  var html='<div class="screen"><div class="ttl"><a class="back" href="#/accueil" aria-label="Retour">‹</a><h1>'+(E?'Vendre des œufs':'Enregistrer une vente')+'</h1></div><form id="f" onsubmit="return false">'+
+  var E=prod==='oeuf',FO=(!E&&finOrder)?finOrder:null;
+  var html='<div class="screen"><div class="ttl"><a class="back" href="#/accueil" aria-label="Retour">‹</a><h1>'+(E?'Vendre des œufs':(FO?'Livrer la commande':'Enregistrer une vente'))+'</h1></div><form id="f" onsubmit="return false">'+
+  (FO?'<div class="box" style="margin-bottom:14px"><b>Commande '+ocodeFmt(FO.code)+'</b><div class="sm" style="color:var(--pDk)">Total convenu : '+fmt(FO.o.tot)+' FCFA · acompte déjà reçu : '+fmt(FO.o.recu||0)+' FCFA · <b>reste à encaisser : '+fmt(Math.max(0,FO.o.tot-(FO.o.recu||0)))+' FCFA</b><br>Dans « Montant reçu », indiquez le total reçu (acompte + reste). Vide = payé en totalité.</div></div>':'')+
   '<div class="fld"><label class="l" for="f_date">Date</label><input class="in" id="f_date" type="date" value="'+todayISO()+'"></div>'+
-  '<div class="fld"><label class="l" for="f_client">Client</label><input class="in" id="f_client" type="text" placeholder="Nom du client"></div>'+
-  '<div class="row fld"><div><label class="l" for="f_qty">'+(E?'Nombre de plateaux (30 œufs)':'Nombre de poulets')+'</label><input class="in" id="f_qty" type="text" inputmode="numeric"></div>'+(E?'<div><label class="l" for="f_pu">Prix par plateau</label><input class="in" id="f_pu" type="text" inputmode="decimal" placeholder="FCFA"></div>':wPrixField())+'</div><div class="sm" id="f_pxn" style="margin:-6px 0 12px"></div>'+
+  '<div class="fld"><label class="l" for="f_client">Client</label><input class="in" id="f_client" type="text" placeholder="Nom du client" value="'+(FO?esc(FO.o.cl||''):'')+'"></div>'+
+  '<div class="row fld"><div><label class="l" for="f_qty">'+(E?'Nombre de plateaux (30 œufs)':'Nombre de poulets')+'</label><input class="in" id="f_qty" type="text" inputmode="numeric" value="'+(FO?FO.o.qty:'')+'"></div>'+(E?'<div><label class="l" for="f_pu">Prix par plateau</label><input class="in" id="f_pu" type="text" inputmode="decimal" placeholder="FCFA"></div>':(FO?'<div><label class="l" for="f_pu">Prix par poulet</label><input class="in" id="f_pu" type="text" value="'+FO.o.pu+'" readonly></div>':wPrixField()))+'</div><div class="sm" id="f_pxn" style="margin:-6px 0 12px"></div>'+
   '<div class="box" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><b>Total de la vente</b><span class="big" style="color:var(--pDk)"><span id="f_total">0</span> <small>FCFA</small></span></div>'+
   '<div class="fld"><div class="l">Mode de paiement</div>'+chips('pay',PAYS,'Espèces')+'</div>'+
   '<div class="fld"><label class="l" for="f_recu">Montant reçu</label><input class="in" id="f_recu" type="text" inputmode="decimal" placeholder="Vide = payé en totalité"></div>'+
@@ -987,15 +1003,15 @@ function vWVente(prod){
   '<button class="btn" type="button" id="save">Envoyer la vente</button></form></div>';
   return {html:html,theme:'t-green',init:function(){
     var calc=function(){var q=Math.floor(num($('#f_qty').value)),t=Math.round(q*num($('#f_pu').value));$('#f_total').textContent=fmt(t);return {q:q,t:t};};
-    $('#f').addEventListener('input',calc);if(!E){wPrixInit(calc);}
+    $('#f').addEventListener('input',calc);if(!E&&!FO){wPrixInit(calc);}else{calc();}
     $('#save').onclick=function(){
-      var c=calc(),pu=E?num($('#f_pu').value):wPrix();
+      var c=calc(),pu=E?num($('#f_pu').value):(FO?FO.o.pu:wPrix());
       if(!(c.q>0)){toast(E?'Saisissez le nombre de plateaux':'Saisissez le nombre de poulets');return;}
       if(!(pu>0)){toast(E?'Saisissez le prix du plateau':'Prix du jour non reçu : connectez-vous à internet puis réessayez');return;}
       var rv=$('#f_recu').value.trim(),pay=chipVal('pay'),recu=rv===''?(pay==='À crédit'?0:c.t):Math.round(num(rv));
-      var rp={type:'vente',date:$('#f_date').value||todayISO(),client:$('#f_client').value.trim().slice(0,60),qty:c.q,pu:pu,recu:recu,pay:pay,note:$('#f_note').value.trim().slice(0,200)};
+      var rp={type:'vente',date:$('#f_date').value||todayISO(),client:$('#f_client').value.trim().slice(0,60),qty:c.q,pu:pu,recu:recu,pay:pay,note:(FO?('Commande '+ocodeFmt(FO.code)+($('#f_note').value.trim()?' · '+$('#f_note').value.trim():'')):$('#f_note').value.trim()).slice(0,200)};
       if(E){rp.prod='oeuf';}
-      queueReport(rp);
+      queueReport(rp);if(FO){cfg.sentCodes=cfg.sentCodes||{};cfg.sentCodes[FO.code]=Date.now();saveCfg();finOrder=null;}
       toast('Enregistré, envoi en cours…');location.hash='#/accueil';
     };
   }};
@@ -1005,7 +1021,7 @@ app.addEventListener('click',function(e){
   if((el=t.closest('[data-ok]'))){validateReport(el.dataset.ok,true);return;}
   if((el=t.closest('[data-no]'))){var rid=el.dataset.no;if(confirm('Rejeter cette saisie ?')){validateReport(rid,false);}return;}
   if(t.closest('[data-sync]')){toast('Actualisation…');ownerSync(false).then(function(a){if(a!==null){toast(a?a+' nouvelle'+(a>1?'s':'')+' saisie'+(a>1?'s':''):'Rien de nouveau');}route();});return;}
-  if((el=t.closest('[data-cmdno]'))){var cid=el.dataset.cmdno;if(confirm('Annuler cette commande ? (Si un acompte a été reçu, pensez à le rendre.)')){db.commandes=db.commandes.filter(function(x){return x.id!==cid;});save();toast('Commande annulée');route();}return;}
+  if((el=t.closest('[data-cmdno]'))){var cid=el.dataset.cmdno;if(confirm('Annuler cette commande ? (Si un acompte a été reçu, pensez à le rendre.)')){var co=db.commandes.filter(function(x){return x.id===cid;})[0];db.commandes=db.commandes.filter(function(x){return x.id!==cid;});if(co){pubOrder(co,'cancel');}save();toast('Commande annulée');route();}return;}
   if(t.closest('[data-wflush]')){toast('Envoi en cours…');workerFlush(false).then(function(){route();});return;}
   if(t.closest('[data-wreset]')){
     var nq=pendingQ().length;
@@ -1440,6 +1456,139 @@ function venPayBind(vk){
 }
 
 
+
+/* ---------- Code de commande + reçus ---------- */
+function ocode(id){var A='ABCDEFGHJKLMNPQRSTUVWXYZ23456789',s=String(id),h1=2166136261,h2=5381,c,i;
+  for(i=0;i<s.length;i++){c=s.charCodeAt(i);h1=Math.imul(h1^c,16777619)>>>0;h2=(Math.imul(h2,33)+c)>>>0;}
+  var h3=Math.imul(h1^(h2>>>7),2654435761)>>>0,n1=h1,n2=(h2^h3)>>>0,o='';
+  for(i=0;i<4;i++){o+=A.charAt(n1&31);n1=n1>>>5;}
+  for(i=0;i<4;i++){o+=A.charAt(n2&31);n2=n2>>>5;}
+  return o;}
+function ocodeFmt(c){return c.slice(0,4)+'-'+c.slice(4);}
+function ocodeNorm(x){return String(x||'').toUpperCase().replace(/[^A-Z0-9]/g,'');}
+function orderCode(c){return c.code||ocode(c.id);}
+function pubOrder(c,st){
+  if(!fbOn()){return;}
+  db.ordq=db.ordq||[];var code=orderCode(c);
+  db.ordq=db.ordq.filter(function(x){return x.code!==code;});
+  db.ordq.push({code:code,o:{cl:String(c.client||'').slice(0,60),tel:String(c.tel||'').slice(0,30),qty:c.qty,pu:c.pu,tot:c.total,recu:c.recu||0,livr:c.livr||'',note:String(c.note||'').slice(0,200),who:c.who||'',st:st,ts:Date.now()}});
+  if(db.ordq.length>200){db.ordq=db.ordq.slice(-150);}
+  save();flushOrders();
+}
+var ordFlush=false;
+async function flushOrders(){
+  if(ordFlush||!fbOn()||!(db.ordq||[]).length){return;}
+  ordFlush=true;
+  try{
+    var tk=await ownerToken();
+    while(db.ordq.length){
+      var it=db.ordq[0],body=toFs(it.o),qs=Object.keys(body.fields).map(function(k){return 'updateMask.fieldPaths='+k;}).join('&');
+      var r=await fetchT(fsBase(cfg.fb.proj)+pre(cfg.fb)+'/pub/o_'+it.code+'?'+qs+'&key='+encodeURIComponent(cfg.fb.key),{method:'PATCH',headers:{'Content-Type':'application/json','Authorization':'Bearer '+tk},body:JSON.stringify(body)});
+      if(r.ok){db.ordq.shift();save();}else{break;}
+    }
+  }catch(e){}
+  finally{ordFlush=false;}
+}
+function waOpen(tel,txt){
+  var n=String(tel||'').replace(/\D/g,'');if(n&&n.length<=8){n='223'+n;}
+  var u='https://wa.me/'+n+'?text='+encodeURIComponent(txt);
+  if(window.AndroidBridge&&window.AndroidBridge.openUrl){window.AndroidBridge.openUrl(u);}else{window.open(u,'_blank');}
+}
+function recuData(id){
+  var cm=null,v=null,farm=cfg.farm||'',d;
+  if(String(id).indexOf('c_')===0){cm=db.commandes.filter(function(x){return x.id===id.slice(2);})[0];if(!cm){return null;}
+    d={kind:'cmd',date:cm.date,client:cm.client,tel:cm.tel||'',qty:cm.qty,pu:cm.pu,total:cm.total,recu:cm.recu||0,pay:cm.pay,livr:cm.livr||'',code:orderCode(cm),unit:cm.qty>1?'poulets':'poulet',no:ocodeFmt(orderCode(cm))};}
+  else{v=db.ventes.filter(function(x){return x.id===id;})[0];if(!v){return null;}
+    var un=v.prod==='oeuf'?(v.qty>1?'plateaux d\'œufs':'plateau d\'œufs'):(v.prod==='reforme'?(v.qty>1?'poules':'poule'):(v.qty>1?'poulets':'poulet'));
+    d={kind:'vente',date:v.date,client:v.client,tel:'',qty:v.qty,pu:v.pu,total:v.total,recu:v.recu,pay:v.pay,unit:un,no:'R-'+String(v.id).slice(-5).toUpperCase()};}
+  d.reste=Math.max(0,d.total-d.recu);d.farm=farm;d.ftel=cfg.farmTel||'';return d;
+}
+function recuRows(d){
+  var r=[];r.push(['Date',fdl(d.date)||d.date]);if(d.client){r.push(['Client',d.client]);}
+  r.push([d.qty+' '+d.unit,'× '+fmt(d.pu)+' F']);r.push(['Total',fmt(d.total)+' FCFA']);
+  r.push([d.kind==='cmd'?'Acompte reçu':'Montant reçu',fmt(d.recu)+' FCFA']);
+  if(d.reste>0){r.push(['Reste à payer',fmt(d.reste)+' FCFA']);}
+  if(d.kind==='cmd'&&d.livr){r.push(['Livraison prévue',fdl(d.livr)||d.livr]);}
+  return r;
+}
+function recuText(d){
+  var t=(d.farm?d.farm+'\n':'Mon Poulailler\n')+(d.ftel?'Tél : '+d.ftel+'\n':'')+'\n'+(d.kind==='cmd'?'COMMANDE CONFIRMÉE':'REÇU DE VENTE')+' N° '+d.no+'\n';
+  recuRows(d).forEach(function(x){t+=x[0]+' : '+x[1]+'\n';});
+  if(d.kind==='cmd'){t+='\nCode de commande : '+ocodeFmt(d.code)+'\nPrésentez ce code pour retirer ou recevoir vos poulets.\n';}
+  t+='\n'+(d.reste>0?'Reste à payer : '+fmt(d.reste)+' FCFA':'✅ PAYÉ')+'\nMerci pour votre confiance !';
+  return t;
+}
+function recuImage(d,cb){
+  var rows=recuRows(d),W=760,H=300+rows.length*54+(d.kind==='cmd'?170:60)+80,cv=document.createElement('canvas');cv.width=W;cv.height=H;
+  var g=cv.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,W,H);g.strokeStyle='#2F6B3F';g.lineWidth=4;g.setLineDash([14,10]);g.strokeRect(20,20,W-40,H-40);g.setLineDash([]);
+  g.textAlign='center';g.fillStyle='#1F1F1F';g.font='bold 40px sans-serif';g.fillText(d.farm||'Mon Poulailler',W/2,95);
+  g.fillStyle='#5F5F5F';g.font='26px sans-serif';if(d.ftel){g.fillText('Tél : '+d.ftel,W/2,138);}
+  g.fillStyle='#2F6B3F';g.font='bold 30px sans-serif';g.fillText((d.kind==='cmd'?'COMMANDE CONFIRMÉE':'REÇU DE VENTE'),W/2,196);
+  g.fillStyle='#5F5F5F';g.font='24px sans-serif';g.fillText('N° '+d.no,W/2,232);
+  var y=290;g.font='28px sans-serif';
+  rows.forEach(function(x){g.strokeStyle='#e6e6e6';g.lineWidth=2;g.beginPath();g.moveTo(50,y-34);g.lineTo(W-50,y-34);g.stroke();
+    g.textAlign='left';g.fillStyle='#444';g.fillText(x[0],60,y);g.textAlign='right';g.fillStyle='#111';g.font='bold 28px sans-serif';g.fillText(x[1],W-60,y);g.font='28px sans-serif';y+=54;});
+  if(d.kind==='cmd'){g.fillStyle='#FFF6DC';g.fillRect(60,y-10,W-120,120);g.textAlign='center';g.fillStyle='#5F5F5F';g.font='24px sans-serif';g.fillText('Code de commande',W/2,y+24);g.fillStyle='#111';g.font='bold 56px sans-serif';g.fillText(ocodeFmt(d.code),W/2,y+86);y+=150;}
+  g.textAlign='center';g.fillStyle=d.reste>0?'#C62828':'#1F4A2B';g.font='bold 34px sans-serif';g.fillText(d.reste>0?'Reste à payer : '+fmt(d.reste)+' FCFA':'PAYÉ',W/2,y+30);
+  g.fillStyle='#5F5F5F';g.font='24px sans-serif';g.fillText('Merci pour votre confiance !',W/2,y+76);
+  cv.toBlob(cb,'image/png');
+}
+function vRecu(id){
+  var d=recuData(id);
+  if(!d){return {html:'<div class="screen"><div class="ttl"><a class="back" href="#/ventes" aria-label="Retour">‹</a><h1>Reçu</h1></div><div class="empty">Introuvable.</div></div>',theme:'t-green'};}
+  function card(d){return '<div class="rc"><div class="fn">'+esc(d.farm||'Mon Poulailler')+'</div>'+(d.ftel?'<div class="ft">Tél : '+esc(d.ftel)+'</div>':'<div class="ft">&nbsp;</div>')+
+    '<div class="rt">'+(d.kind==='cmd'?'COMMANDE CONFIRMÉE':'REÇU DE VENTE')+'</div><div class="rn">N° '+esc(d.no)+'</div>'+
+    recuRows(d).map(function(x){return '<div class="ln"><span>'+esc(x[0])+'</span><b>'+esc(x[1])+'</b></div>';}).join('')+
+    (d.kind==='cmd'?'<div class="cd"><div class="sm">Code de commande</div><div class="c">'+ocodeFmt(d.code)+'</div><div class="sm">À présenter pour retirer ou recevoir vos poulets</div></div>':'')+
+    '<div class="st '+(d.reste>0?'no':'ok')+'">'+(d.reste>0?'Reste à payer : '+fmt(d.reste)+' FCFA':'✅ PAYÉ')+'</div></div>';}
+  var back=d.kind==='cmd'?'#/commandes':'#/ventes';
+  var html='<div class="screen"><div class="ttl"><a class="back" href="'+back+'" aria-label="Retour">‹</a><h1>'+(d.kind==='cmd'?'Code et reçu':'Reçu')+'</h1></div>'+
+  '<div class="row fld"><div><label class="l" for="f_farm">Nom sur le reçu</label><input class="in" id="f_farm" type="text" maxlength="40" value="'+esc(cfg.farm||'')+'" placeholder="ex. Ferme Traoré"></div><div><label class="l" for="f_ftel">Votre téléphone</label><input class="in" id="f_ftel" type="tel" maxlength="20" value="'+esc(cfg.farmTel||'')+'" placeholder="ex. 70 00 00 00"></div></div>'+
+  '<div id="rcard">'+card(d)+'</div>'+
+  (d.kind==='cmd'&&d.tel?'<button class="btn" type="button" id="r_wa">Envoyer au client par WhatsApp</button>':'')+
+  '<button class="btn'+(d.kind==='cmd'&&d.tel?' alt':'')+'" type="button" id="r_sh">Partager le reçu (texte)</button>'+
+  '<button class="btn alt" type="button" id="r_img" hidden>Partager en image</button>'+
+  '<div class="sm" style="margin-top:8px">Astuce : vous pouvez aussi faire une capture d\'écran du reçu.</div></div>';
+  return {html:html,theme:'t-green',init:function(){
+    var cur=function(){var x=recuData(id);return x;};
+    var upd=function(){cfg.farm=$('#f_farm').value.trim().slice(0,40);cfg.farmTel=$('#f_ftel').value.trim().slice(0,20);saveCfg();var x=cur();if(x){$('#rcard').innerHTML=card(x);}};
+    $('#f_farm').oninput=upd;$('#f_ftel').oninput=upd;
+    if($('#r_wa')){$('#r_wa').onclick=function(){var x=cur();waOpen(x.tel,recuText(x));};}
+    $('#r_sh').onclick=function(){shareOrCopy(recuText(cur()),'Reçu copié');};
+    try{var tf=new File([new Blob(['x'],{type:'image/png'})],'recu.png',{type:'image/png'});
+      if(navigator.canShare&&navigator.canShare({files:[tf]})){$('#r_img').hidden=false;
+        $('#r_img').onclick=function(){var x=cur();recuImage(x,function(b){if(!b){toast('Image impossible');return;}
+          navigator.share({files:[new File([b],'recu-'+x.no+'.png',{type:'image/png'})],text:x.farm||'Mon Poulailler'}).catch(function(){});});};}}catch(e){}
+  }};
+}
+/* Gérant : retrouver une commande avec son code */
+var finOrder=null;
+function vWCode(){
+  finOrder=null;
+  var html='<div class="screen"><div class="ttl"><a class="back" href="#/accueil" aria-label="Retour">‹</a><h1>Retrouver une commande</h1></div>'+
+  '<div class="fld"><label class="l" for="f_code">Code de commande du client</label><input class="in" id="f_code" type="text" maxlength="10" autocapitalize="characters" autocomplete="off" placeholder="ex. K7M2-4QX9" style="font-size:24px;letter-spacing:.1em;text-transform:uppercase"></div>'+
+  '<button class="btn" type="button" id="c_go">Chercher la commande</button><div id="c_res" style="margin-top:14px"></div></div>';
+  return {html:html,theme:'t-green',init:function(){
+    $('#c_go').onclick=async function(){
+      var code=ocodeNorm($('#f_code').value),res=$('#c_res');
+      if(code.length!==8){toast('Le code a 8 caractères');return;}
+      res.innerHTML='<div class="box">Recherche…</div>';
+      try{
+        var r=await fetchT(fsBase(cfg.worker.proj)+pre(cfg.worker)+'/pub/o_'+code+'?key='+encodeURIComponent(cfg.worker.key),{},12000);
+        if(r.status===404){res.innerHTML='<div class="box redbox"><b>Code introuvable</b><div class="sm">Vérifiez le code. Si le client vient de commander, le promoteur doit d\'abord confirmer sa commande.</div></div>';return;}
+        if(!r.ok){res.innerHTML='<div class="box redbox"><b>Erreur ('+r.status+')</b><div class="sm">Réessayez dans un instant.</div></div>';return;}
+        var j=await r.json(),o=fromFs(j.fields),reste=Math.max(0,(o.tot||0)-(o.recu||0)),sent=cfg.sentCodes&&cfg.sentCodes[code];
+        var stt=o.st==='open'?'<div class="box" style="background:var(--greenBg,#E6F0E8)"><b>✓ Commande confirmée par le promoteur</b></div>':(o.st==='done'?'<div class="box redbox"><b>Déjà livrée</b><div class="sm">Cette commande a déjà été livrée. Ne la livrez pas une seconde fois.</div></div>':'<div class="box redbox"><b>Commande annulée</b></div>');
+        res.innerHTML=stt+'<div class="card"><div style="display:flex;justify-content:space-between;gap:8px"><b>'+esc(o.cl||'Client')+'</b><span class="sm">'+(o.livr?'Livraison '+fd(o.livr):'Sans date')+'</span></div>'+(o.tel?'<div class="sm" style="margin-top:2px">Tél. '+esc(o.tel)+'</div>':'')+
+          '<div class="box" style="margin:10px 0"><b>'+o.qty+' poulet'+(o.qty>1?'s':'')+' × '+fmt(o.pu)+' = '+fmt(o.tot)+' FCFA</b><br><span class="sm">'+(o.recu>0?'Acompte reçu : '+fmt(o.recu):'Aucun argent reçu')+' · <b>reste à encaisser : '+fmt(reste)+' FCFA</b></span>'+(o.note?'<br><span class="sm">'+esc(o.note)+'</span>':'')+'</div>'+
+          (sent&&o.st==='open'?'<div class="sm mort" style="margin-bottom:8px">Vous avez déjà envoyé la vente de cette commande. Le promoteur doit la valider.</div>':'')+
+          (o.st==='open'?'<button class="btn" type="button" id="c_fin">Finaliser la vente</button><div class="sm" style="margin-top:6px">Le promoteur garde le dernier mot : il validera ou rejettera la vente.</div>':'')+'</div>';
+        if(o.st==='open'){$('#c_fin').onclick=function(){finOrder={code:code,o:o};location.hash='#/wvente';};}
+      }catch(e){res.innerHTML='<div class="box redbox"><b>'+esc(errMsg(e))+'</b></div>';}
+    };
+  }};
+}
+
 /* ---------- Code court gérant + lien de commande en ligne ---------- */
 var ORDER_BASE='https://almoustaphtraore.github.io/mon-poulailler-web/commande.html';
 function invCode(){var A='ABCDEFGHJKLMNPQRSTUVWXYZ23456789',b=new Uint8Array(6),s='';try{crypto.getRandomValues(b);}catch(e){for(var i=0;i<6;i++){b[i]=Math.floor(Math.random()*256);}}for(var j=0;j<6;j++){s+=A.charAt(b[j]%32);}return s;}
@@ -1468,12 +1617,12 @@ async function invUse(code){
 function orderLink(){var f=cfg.fb||{};return ORDER_BASE+'?p='+encodeURIComponent(f.proj||'')+'&k='+encodeURIComponent(f.key||'')+(f.pre?'&b='+encodeURIComponent(f.pre.slice(5)):'')+(cfg.farm?'&n='+encodeURIComponent(cfg.farm):'');}
 function orderCard(){
   return '<div class="card"><div class="h2">3. Lien de commande pour vos clients</div><div class="sm" style="margin-bottom:10px">Vos clients ouvrent ce lien, voient votre prix du jour et envoient leur commande. Elle arrive dans « À valider ». Aucun paiement en ligne.</div>'+
-  '<div class="fld"><label class="l" for="f_farm">Nom de votre ferme (affiché au client)</label><input class="in" id="f_farm" type="text" maxlength="40" value="'+esc(cfg.farm||'')+'" placeholder="ex. Ferme Traoré"></div>'+
+  '<div class="fld"><label class="l" for="f_farm">Nom de votre ferme (affiché au client et sur les reçus)</label><input class="in" id="f_farm" type="text" maxlength="40" value="'+esc(cfg.farm||'')+'" placeholder="ex. Ferme Traoré"></div><div class="fld"><label class="l" for="f_ftel">Votre téléphone (sur les reçus)</label><input class="in" id="f_ftel" type="tel" maxlength="20" value="'+esc(cfg.farmTel||'')+'" placeholder="ex. 70 00 00 00"></div>'+
   '<div class="row"><button class="btn sm" type="button" id="ord_sh" style="margin:0">Partager le lien</button><button class="btn alt sm" type="button" id="ord_cp" style="margin:0">Copier</button></div></div>';
 }
 function orderBind(){
   var f=$('#f_farm');if(!f){return;}
-  f.oninput=function(){cfg.farm=f.value.trim().slice(0,40);saveCfg();};
+  f.oninput=function(){cfg.farm=f.value.trim().slice(0,40);saveCfg();};var ft=$('#f_ftel');if(ft){ft.oninput=function(){cfg.farmTel=ft.value.trim().slice(0,20);saveCfg();};}
   $('#ord_sh').onclick=function(){shareOrCopy('Commandez vos poulets en ligne'+(cfg.farm?' chez '+cfg.farm:'')+' :\n'+orderLink(),'Lien copié');};
   $('#ord_cp').onclick=function(){toast(copyText(orderLink())?'Lien copié':'Copie impossible');};
 }
@@ -1580,11 +1729,13 @@ function route(){
     else{render(vRole(),r);return;}
   }
   if(r==='securite'&&cfg.role){render(vSecurite(),r);return;}
+  if(r!=='wvente'&&r!=='wcode'){finOrder=null;}
   if(cfg.role==='worker'){
     if(!cfg.worker&&r!=='wsetup'){location.replace('#/wsetup');return;}
-    var wv={wsetup:vWSetup,wmort:vWMort,wvente:function(){return vWVente('');},woeuf:vWOeuf,woeufv:function(){return vWVente('oeuf');},wcmd:vWCmd,wdettes:vWDettes};
+    var wv={wsetup:vWSetup,wcode:vWCode,wmort:vWMort,wvente:function(){return vWVente('');},woeuf:vWOeuf,woeufv:function(){return vWVente('oeuf');},wcmd:vWCmd,wdettes:vWDettes};
     render((wv[r]||vWHome)(),r);return;
   }
+  if(r==='recu'){render(vRecu(arg),r);return;}
   if(r==='licence'){render(vLicence(),r);return;}
   var st=licState();
   if(({employes:1,valider:1,activite:1,commandes:1})[r]&&st.mode!=='paid'){render(vLock('adv'),r);return;}
@@ -1644,6 +1795,7 @@ function prixCard(){
 var pubing=false;
 function statPending(){var p=db.prix,st=db.stat;return !!((db.bandes.length&&db.typesPub!==typesNow())||(p&&p.v&&!(p.pub>=p.ts))||(st&&(!(st.pub>=st.ts)||st.dispoPub!==st.dispo)));}
 async function publishState(silent){
+  flushOrders();
   var p=db.prix,st=db.stat;
   if(pubing||!fbOn()||!statPending()){return false;}
   pubing=true;var ok=false;
@@ -1751,7 +1903,7 @@ function bindStat(){
 /* ---------- Centre : mises à jour + comptage des appareils ---------- */
 var CENTER={proj:'poulebox',key:'AIzaSyDaAkRRkGchPMrBw6oVKb4fhSFb2qptuWM'};
 function cenOn(){return !!(CENTER.proj&&CENTER.key);}
-var WEBVER='3.7.2 web';
+var WEBVER='3.7.3 web';
 function isWeb(){return !(window.AndroidBridge&&window.AndroidBridge.appInfo);}
 function appInfo(){if(isWeb()){return {name:WEBVER,code:999999};}try{var s=window.AndroidBridge&&window.AndroidBridge.appInfo&&window.AndroidBridge.appInfo();if(s){var a=String(s).split('|');return {name:a[0],code:parseInt(a[1],10)||0};}}catch(e){}return null;}
 function devId(){if(isWeb()){return normDev(getDev());}try{return String((window.AndroidBridge&&window.AndroidBridge.deviceId&&window.AndroidBridge.deviceId())||'').replace(/[^A-Z0-9]/g,'');}catch(e){return '';}}

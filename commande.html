@@ -17,6 +17,13 @@ button{width:100%;margin-top:16px;height:52px;border:0;border-radius:12px;backgr
 var q=new URLSearchParams(location.search),P=q.get('p')||'',K=q.get('k')||'',B=/^[a-z0-9]{16,48}$/.test(q.get('b')||'')?'/box/'+q.get('b'):'',N=(q.get('n')||'').slice(0,40);
 var app=document.getElementById('app');if(N){document.getElementById('farm').textContent=N;document.title='Commander · '+N;}
 var STL={croissance:'Poulets en croissance',bientot:'Bientôt prêts',pret:'Prêts à la vente'};
+function ocode(id){var A='ABCDEFGHJKLMNPQRSTUVWXYZ23456789',s=String(id),h1=2166136261,h2=5381,c,i;
+  for(i=0;i<s.length;i++){c=s.charCodeAt(i);h1=Math.imul(h1^c,16777619)>>>0;h2=(Math.imul(h2,33)+c)>>>0;}
+  var h3=Math.imul(h1^(h2>>>7),2654435761)>>>0,n1=h1,n2=(h2^h3)>>>0,o='';
+  for(i=0;i<4;i++){o+=A.charAt(n1&31);n1=n1>>>5;}
+  for(i=0;i<4;i++){o+=A.charAt(n2&31);n2=n2>>>5;}
+  return o;}
+function ocodeFmt(c){return c.slice(0,4)+'-'+c.slice(4);}
 function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
 function fmt(n){return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g,' ');}
 function base(){return 'https://firestore.googleapis.com/v1/projects/'+encodeURIComponent(P)+'/databases/(default)/documents'+B;}
@@ -44,7 +51,7 @@ fetch(base()+'/pub/state?key='+encodeURIComponent(K)).then(function(r){return r.
     b.disabled=true;b.textContent='Envoi…';
     fetch(base()+'/reports?documentId='+encodeURIComponent(id)+'&key='+encodeURIComponent(K),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fields:o})}).then(function(r){
       if(!r.ok){throw 0;}
-      app.innerHTML='<div class="box ok"><b>✓ Commande envoyée</b><div class="sm" style="color:inherit;margin-top:6px">'+n+' poulet'+(n>1?'s':'')+' · '+fmt(n*prix)+' FCFA. Le vendeur vous appellera au '+esc(t)+'.</div></div>';
+      var cd=ocodeFmt(ocode(id));app.innerHTML='<div class="box ok"><b>✓ Commande envoyée</b><div class="sm" style="color:inherit;margin-top:6px">'+n+' poulet'+(n>1?'s':'')+' · '+fmt(n*prix)+' FCFA. Le vendeur vous appellera au '+esc(t)+'.</div></div><div class="box" style="text-align:center;background:#FFF6DC"><div class="sm">Votre code de commande</div><div style="font-size:34px;font-weight:800;letter-spacing:.12em;margin:6px 0">'+cd+'</div><div class="sm">Notez ou faites une capture de ce code. Présentez-le au vendeur ou à son gérant pour retirer vos poulets. Il sera valable dès que le vendeur aura confirmé votre commande.</div></div>';
     }).catch(function(){b.disabled=false;b.textContent='Envoyer ma commande';alert('Envoi impossible. Vérifiez internet et réessayez.');});
   };
 }).catch(function(){app.innerHTML='<div class="box no">Pas de connexion internet. Réessayez.</div>';});
