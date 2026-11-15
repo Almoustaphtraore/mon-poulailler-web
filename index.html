@@ -944,7 +944,7 @@ function vWHome(){
   '<div class="sm" style="margin:6px 0 16px">Le promoteur vérifie puis valide chaque saisie.</div>'+
   '<h2 class="h2">Mes dernières saisies</h2>'+
   (list.length?list.map(function(x){var d=x.data;
-    return '<div class="item"><div class="main"><div class="t'+(d.type==='mort'?' mort':'')+'">'+repLabel(d)+'</div><div class="d">'+fd(d.date)+repDetail(d)+'</div></div><div class="r"><span class="tag" style="background:'+(cfg.mydec&&cfg.mydec[x.id]===0?'var(--redBg,#FDECEC);color:var(--red)':(x.sent?'var(--greenBg);color:var(--greenDk)':'var(--amberBg);color:var(--amber)'))+'">'+(function(){var dv=cfg.mydec&&cfg.mydec[x.id];return dv===1?'Validée ✓':(dv===0?'Rejetée ✗':(x.sent?'Envoyé ✓':'En attente'));})()+'</span></div></div>';}).join(''):'<div class="empty">Aucune saisie pour le moment.</div>')+
+    return '<div class="item"><div class="main"><div class="t'+(d.type==='mort'?' mort':'')+'">'+repLabel(d)+'</div><div class="d">'+fd(d.date)+repDetail(d)+'</div></div><div class="r"><span class="tag" style="background:'+(cfg.mydec&&cfg.mydec[x.id]===0?'var(--redBg,#FDECEC);color:var(--red)':(x.sent?'var(--greenBg);color:var(--greenDk)':'var(--amberBg);color:var(--amber)'))+'">'+(function(){var dv=cfg.mydec&&cfg.mydec[x.id];return dv===1?'Validée ✓':(dv===0?'Rejetée ✗':(x.sent?'Envoyé ✓':'En attente'));})()+'</span>'+(d.type==='commande'?'<a class="chip sm" href="#/wrecu/'+esc(d.id)+'" style="margin-top:6px;display:inline-block;text-decoration:none">Reçu</a>':'')+'</div></div>';}).join(''):'<div class="empty">Aucune saisie pour le moment.</div>')+
   '<a class="btn alt" href="#/securite" style="margin-top:16px">'+(pinOn()?'🔒 Code de verrouillage (activé)':'Code de verrouillage')+'</a>'+
   '<div style="margin-top:20px"><button class="chip sm" type="button" data-wreset="1">Changer de configuration</button></div></div>';
   return {html:html,theme:'t-green',init:function(){
@@ -1471,7 +1471,7 @@ function pubOrder(c,st){
   if(!fbOn()){return;}
   db.ordq=db.ordq||[];var code=orderCode(c);
   db.ordq=db.ordq.filter(function(x){return x.code!==code;});
-  db.ordq.push({code:code,o:{cl:String(c.client||'').slice(0,60),tel:String(c.tel||'').slice(0,30),qty:c.qty,pu:c.pu,tot:c.total,recu:c.recu||0,livr:c.livr||'',note:String(c.note||'').slice(0,200),who:c.who||'',st:st,ts:Date.now()}});
+  db.ordq.push({code:code,o:{cl:String(c.client||'').slice(0,60),tel:String(c.tel||'').slice(0,30),qty:c.qty,pu:c.pu,tot:c.total,recu:c.recu||0,livr:c.livr||'',note:String(c.note||'').slice(0,200),who:c.who||'',dt:c.date||'',fm:cfg.farm||'',ft:cfg.farmTel||'',st:st,ts:Date.now()}});
   if(db.ordq.length>200){db.ordq=db.ordq.slice(-150);}
   save();flushOrders();
 }
@@ -1533,32 +1533,57 @@ function recuImage(d,cb){
   g.fillStyle='#5F5F5F';g.font='24px sans-serif';g.fillText('Merci pour votre confiance !',W/2,y+76);
   cv.toBlob(cb,'image/png');
 }
-function vRecu(id){
-  var d=recuData(id);
-  if(!d){return {html:'<div class="screen"><div class="ttl"><a class="back" href="#/ventes" aria-label="Retour">‹</a><h1>Reçu</h1></div><div class="empty">Introuvable.</div></div>',theme:'t-green'};}
-  function card(d){return '<div class="rc"><div class="fn">'+esc(d.farm||'Mon Poulailler')+'</div>'+(d.ftel?'<div class="ft">Tél : '+esc(d.ftel)+'</div>':'<div class="ft">&nbsp;</div>')+
+function recuCard(d){return '<div class="rc"><div class="fn">'+esc(d.farm||'Mon Poulailler')+'</div>'+(d.ftel?'<div class="ft">Tél : '+esc(d.ftel)+'</div>':'<div class="ft">&nbsp;</div>')+
     '<div class="rt">'+(d.kind==='cmd'?'COMMANDE CONFIRMÉE':'REÇU DE VENTE')+'</div><div class="rn">N° '+esc(d.no)+'</div>'+
     recuRows(d).map(function(x){return '<div class="ln"><span>'+esc(x[0])+'</span><b>'+esc(x[1])+'</b></div>';}).join('')+
     (d.kind==='cmd'?'<div class="cd"><div class="sm">Code de commande</div><div class="c">'+ocodeFmt(d.code)+'</div><div class="sm">À présenter pour retirer ou recevoir vos poulets</div></div>':'')+
     '<div class="st '+(d.reste>0?'no':'ok')+'">'+(d.reste>0?'Reste à payer : '+fmt(d.reste)+' FCFA':'✅ PAYÉ')+'</div></div>';}
+function sendRecuImage(d,tel){
+  recuImage(d,function(b){
+    if(!b){toast('Image impossible');return;}
+    var B=window.AndroidBridge;
+    if(B&&B.shareImage){var rd=new FileReader();rd.onload=function(){var u=String(rd.result);B.shareImage('recu-'+d.no+'.png',u.slice(u.indexOf(',')+1),tel||'');};rd.readAsDataURL(b);return;}
+    if(B){toast('Mettez l\'application à jour pour envoyer en image');shareOrCopy(recuText(d),'Reçu copié');return;}
+    try{var f=new File([b],'recu-'+d.no+'.png',{type:'image/png'});if(navigator.canShare&&navigator.canShare({files:[f]})){navigator.share({files:[f],text:d.farm||''}).catch(function(){});return;}}catch(e){}
+    var u2=URL.createObjectURL(b),a=document.createElement('a');a.href=u2;a.download='recu-'+d.no+'.png';document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(u2);},4000);toast('Image enregistrée : envoyez-la depuis votre galerie');
+  });
+}
+function vRecu(id){
+  var d=recuData(id);
+  if(!d){return {html:'<div class="screen"><div class="ttl"><a class="back" href="#/ventes" aria-label="Retour">‹</a><h1>Reçu</h1></div><div class="empty">Introuvable.</div></div>',theme:'t-green'};}
   var back=d.kind==='cmd'?'#/commandes':'#/ventes';
   var html='<div class="screen"><div class="ttl"><a class="back" href="'+back+'" aria-label="Retour">‹</a><h1>'+(d.kind==='cmd'?'Code et reçu':'Reçu')+'</h1></div>'+
   '<div class="row fld"><div><label class="l" for="f_farm">Nom sur le reçu</label><input class="in" id="f_farm" type="text" maxlength="40" value="'+esc(cfg.farm||'')+'" placeholder="ex. Ferme Traoré"></div><div><label class="l" for="f_ftel">Votre téléphone</label><input class="in" id="f_ftel" type="tel" maxlength="20" value="'+esc(cfg.farmTel||'')+'" placeholder="ex. 70 00 00 00"></div></div>'+
-  '<div id="rcard">'+card(d)+'</div>'+
-  (d.kind==='cmd'&&d.tel?'<button class="btn" type="button" id="r_wa">Envoyer au client par WhatsApp</button>':'')+
-  '<button class="btn'+(d.kind==='cmd'&&d.tel?' alt':'')+'" type="button" id="r_sh">Partager le reçu (texte)</button>'+
-  '<button class="btn alt" type="button" id="r_img" hidden>Partager en image</button>'+
+  '<div id="rcard">'+recuCard(d)+'</div>'+
+  '<button class="btn" type="button" id="r_img">Envoyer en image par WhatsApp</button>'+
+  '<button class="btn alt" type="button" id="r_sh">Envoyer en texte</button>'+
   '<div class="sm" style="margin-top:8px">Astuce : vous pouvez aussi faire une capture d\'écran du reçu.</div></div>';
   return {html:html,theme:'t-green',init:function(){
     var cur=function(){var x=recuData(id);return x;};
-    var upd=function(){cfg.farm=$('#f_farm').value.trim().slice(0,40);cfg.farmTel=$('#f_ftel').value.trim().slice(0,20);saveCfg();var x=cur();if(x){$('#rcard').innerHTML=card(x);}};
+    var upd=function(){cfg.farm=$('#f_farm').value.trim().slice(0,40);cfg.farmTel=$('#f_ftel').value.trim().slice(0,20);saveCfg();var x=cur();if(x){$('#rcard').innerHTML=recuCard(x);}};
     $('#f_farm').oninput=upd;$('#f_ftel').oninput=upd;
-    if($('#r_wa')){$('#r_wa').onclick=function(){var x=cur();waOpen(x.tel,recuText(x));};}
-    $('#r_sh').onclick=function(){shareOrCopy(recuText(cur()),'Reçu copié');};
-    try{var tf=new File([new Blob(['x'],{type:'image/png'})],'recu.png',{type:'image/png'});
-      if(navigator.canShare&&navigator.canShare({files:[tf]})){$('#r_img').hidden=false;
-        $('#r_img').onclick=function(){var x=cur();recuImage(x,function(b){if(!b){toast('Image impossible');return;}
-          navigator.share({files:[new File([b],'recu-'+x.no+'.png',{type:'image/png'})],text:x.farm||'Mon Poulailler'}).catch(function(){});});};}}catch(e){}
+    $('#r_img').onclick=function(){var x=cur();sendRecuImage(x,x.tel);};
+    $('#r_sh').onclick=function(){var x=cur();if(x.tel){waOpen(x.tel,recuText(x));}else{shareOrCopy(recuText(x),'Reçu copié');}};
+  }};
+}
+function vWRecu(id){
+  var code=ocode(id);
+  var html='<div class="screen"><div class="ttl"><a class="back" href="#/accueil" aria-label="Retour">‹</a><h1>Reçu de la commande</h1></div><div id="wr"><div class="box">Chargement…</div></div></div>';
+  return {html:html,theme:'t-green',init:async function(){
+    var box=$('#wr');
+    try{
+      var r=await fetchT(fsBase(cfg.worker.proj)+pre(cfg.worker)+'/pub/o_'+code+'?key='+encodeURIComponent(cfg.worker.key),{},12000);
+      if(r.status===404){box.innerHTML='<div class="box redbox"><b>Pas encore confirmée</b><div class="sm">Le promoteur doit d\'abord valider cette commande. Réessayez ensuite.</div></div>';return;}
+      if(!r.ok){box.innerHTML='<div class="box redbox"><b>Erreur ('+r.status+')</b><div class="sm">Réessayez dans un instant.</div></div>';return;}
+      var o=fromFs((await r.json()).fields);
+      if(o.st==='cancel'){box.innerHTML='<div class="box redbox"><b>Commande annulée par le promoteur</b></div>';return;}
+      var q=(cfg.queue||[]).filter(function(x){return x.id===id;})[0],dt=o.dt||(q&&q.data.date)||todayISO();
+      var d={kind:'cmd',date:dt,client:o.cl,tel:o.tel||'',qty:o.qty,pu:o.pu,total:o.tot,recu:o.recu||0,livr:o.livr||'',code:code,unit:o.qty>1?'poulets':'poulet',no:ocodeFmt(code),farm:o.fm||'',ftel:o.ft||''};
+      d.reste=Math.max(0,d.total-d.recu);
+      box.innerHTML='<div id="rcard">'+recuCard(d)+'</div><button class="btn" type="button" id="r_img">Envoyer en image par WhatsApp</button><button class="btn alt" type="button" id="r_sh">Envoyer en texte</button>';
+      $('#r_img').onclick=function(){sendRecuImage(d,d.tel);};
+      $('#r_sh').onclick=function(){if(d.tel){waOpen(d.tel,recuText(d));}else{shareOrCopy(recuText(d),'Reçu copié');}};
+    }catch(e){box.innerHTML='<div class="box redbox"><b>'+esc(errMsg(e))+'</b></div>';}
   }};
 }
 /* Gérant : retrouver une commande avec son code */
@@ -1732,7 +1757,7 @@ function route(){
   if(r!=='wvente'&&r!=='wcode'){finOrder=null;}
   if(cfg.role==='worker'){
     if(!cfg.worker&&r!=='wsetup'){location.replace('#/wsetup');return;}
-    var wv={wsetup:vWSetup,wcode:vWCode,wmort:vWMort,wvente:function(){return vWVente('');},woeuf:vWOeuf,woeufv:function(){return vWVente('oeuf');},wcmd:vWCmd,wdettes:vWDettes};
+    var wv={wsetup:vWSetup,wcode:vWCode,wrecu:function(){return vWRecu(arg);},wmort:vWMort,wvente:function(){return vWVente('');},woeuf:vWOeuf,woeufv:function(){return vWVente('oeuf');},wcmd:vWCmd,wdettes:vWDettes};
     render((wv[r]||vWHome)(),r);return;
   }
   if(r==='recu'){render(vRecu(arg),r);return;}
@@ -1903,7 +1928,7 @@ function bindStat(){
 /* ---------- Centre : mises à jour + comptage des appareils ---------- */
 var CENTER={proj:'poulebox',key:'AIzaSyDaAkRRkGchPMrBw6oVKb4fhSFb2qptuWM'};
 function cenOn(){return !!(CENTER.proj&&CENTER.key);}
-var WEBVER='3.7.3 web';
+var WEBVER='3.7.4 web';
 function isWeb(){return !(window.AndroidBridge&&window.AndroidBridge.appInfo);}
 function appInfo(){if(isWeb()){return {name:WEBVER,code:999999};}try{var s=window.AndroidBridge&&window.AndroidBridge.appInfo&&window.AndroidBridge.appInfo();if(s){var a=String(s).split('|');return {name:a[0],code:parseInt(a[1],10)||0};}}catch(e){}return null;}
 function devId(){if(isWeb()){return normDev(getDev());}try{return String((window.AndroidBridge&&window.AndroidBridge.deviceId&&window.AndroidBridge.deviceId())||'').replace(/[^A-Z0-9]/g,'');}catch(e){return '';}}
