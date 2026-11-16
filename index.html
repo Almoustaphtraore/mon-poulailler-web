@@ -274,7 +274,7 @@ function vHome(){
   '<div class="hm">Mortalité : <b>'+s.dead+'</b> mort'+(s.dead>1?'s':'')+' · <b>'+pct(s.rate)+'</b></div></div>'+
   (P?ponteCard(b,s):'')+
   (P?'<a class="btn2" href="#/oeufs">Ramassage des œufs</a>':'<a class="btn2" href="#/saisie">Saisie du jour</a>')+chips+mk+
-  '<div class="two"><div class="al'+(alerts.length?'':' ok')+'" data-tg="alall"><b>'+(alerts.length?alerts.length+' alerte'+(alerts.length>1?'s':''):'Aucune alerte')+'</b><span>'+(alerts.length?alerts[0]:'Tout va bien')+'</span></div>'+tile+'</div>'+
+  '<div class="two"><div class="al'+(alerts.length?'':' ok')+'" data-tg="alall"><b>'+(alerts.length?alerts.length+' alerte'+(alerts.length>1?'s':''):'Aucune alerte')+'</b><span>'+(alerts.length?alerts[0]:'Tout va bien')+'</span></div>'+tile+'</div>'+planCard(b,P)+
   '<div id="alall" hidden class="card"><div class="h2">Alertes</div>'+alerts.map(function(a){return '<div class="line"><span>⚠ '+a+'</span></div>';}).join('')+'</div></div>';
   return {html:html,theme:'t-green',init:function(){bindBsel();bindPrix();bindStat();
     app.querySelectorAll('[data-tg]').forEach(function(el){el.onclick=function(){var t=document.getElementById(el.dataset.tg);if(t){t.hidden=!t.hidden;}};});
@@ -1268,6 +1268,44 @@ function vClimat(){
   }};
 }
 
+/* Objectifs Cobb500 (Performance & Nutrition Supplement 2022), mélangé, jours 0 à 56 */
+var COBBW=[42, 55, 71, 90, 112, 138, 168, 202, 240, 283, 330, 382, 440, 503, 570, 639, 711, 786, 864, 945, 1029, 1116, 1205, 1296, 1390, 1486, 1583, 1682, 1783, 1886, 1989, 2094, 2200, 2306, 2413, 2521, 2629, 2738, 2846, 2954, 3062, 3170, 3278, 3384, 3490, 3595, 3699, 3801, 3902, 4001, 4099, 4195, 4289, 4380, 4470, 4557, 4641];
+var COBBF=[180, 220, 264, 314, 371, 435, 508, 588, 672, 763, 861, 966, 1077, 1195, 1320, 1451, 1588, 1731, 1880, 2034, 2194, 2359, 2528, 2702, 2880, 3063, 3250, 3441, 3635, 3833, 4035, 4241, 4450, 4663, 4880, 5100, 5324, 5552, 5784, 6020, 6259, 6502, 6749, 6999, 7252, 7508, 7766, 8026, 8287, 8549]; /* aliment cumulé par poulet (g), jours 7 à 56 */
+function cobbDay(d){return Math.max(0,Math.min(56,Math.round(d)));}
+function cobbW(d){return COBBW[cobbDay(d)];}
+function cobbFeed(d){d=cobbDay(d);return d<7?Math.round(COBBF[0]*d/7):COBBF[d-7];}
+function cobbFcr(d){d=Math.max(7,cobbDay(d));return COBBF[d-7]/COBBW[d];}
+function cobbPhase(d){return d<=12?'Démarrage':d<=28?'Croissance 1':d<=39?'Croissance 2':'Finition';}
+var VAXDEF=[{j:1,t:'Vaccin Newcastle (poussins)'},{j:10,t:'Vaccin Gumboro'},{j:18,t:'Rappel Gumboro'},{j:22,t:'Rappel Newcastle'},{j:13,t:'Passer à l\'aliment croissance 1'},{j:29,t:'Passer à l\'aliment croissance 2'},{j:40,t:'Passer à l\'aliment finition'},{j:42,t:'Peser un échantillon : prêts à vendre ?'}];
+function vaxList(){var l=(cfg.vax&&cfg.vax.length)?cfg.vax:VAXDEF;return l.slice().sort(function(a,b){return a.j-b.j;});}
+function planCard(b,P){
+  if(P||!b||b.fin){return '';}
+  var d=dayN(b),w=cobbW(d),ph=cobbPhase(d),l=vaxList(),now=l.filter(function(x){return x.j===d;}),nx=l.filter(function(x){return x.j>d;})[0],late=l.filter(function(x){return x.j<d&&x.j>=d-1;});
+  var h='<div class="card"><div class="h2" style="color:var(--green)">Plan de la vague · jour '+d+'</div>'+
+  '<div class="line"><span>Poids attendu (Cobb500)</span><b>'+(d<=56?fmt(w)+' g':'—')+'</b></div>'+
+  '<div class="line"><span>Aliment actuel</span><b>'+ph+'</b></div>'+
+  (d<=56?'<div class="line"><span>Aliment attendu par poulet depuis le début</span><b>'+fmt(cobbFeed(d))+' g</b></div>':'')+
+  now.map(function(x){return '<div class="box" style="margin-top:8px"><b>Aujourd\'hui :</b> '+esc(x.t)+'</div>';}).join('')+
+  (nx?'<div class="sm" style="margin-top:8px">Prochain rappel : <b>jour '+nx.j+'</b> (dans '+(nx.j-d)+' jour'+(nx.j-d>1?'s':'')+') · '+esc(nx.t)+'</div>':'')+
+  '<div class="sm" style="margin-top:6px">Objectifs Cobb500 (2022). Calendrier à confirmer avec votre vétérinaire. <a href="#/rappels">Modifier les rappels</a></div></div>';
+  return h;
+}
+function vRappels(){
+  var l=vaxList();
+  function row(x,i){return '<div class="card" style="padding:10px"><div class="row"><div class="fld" style="flex:0 0 80px"><label class="l" for="r_j'+i+'">Jour</label><input class="in" id="r_j'+i+'" type="text" inputmode="numeric" value="'+x.j+'"></div><div class="fld" style="flex:1"><label class="l" for="r_t'+i+'">Rappel</label><input class="in" id="r_t'+i+'" type="text" value="'+esc(x.t)+'"></div></div><button class="btn danger sm" type="button" data-rdel="'+i+'">Supprimer</button></div>';}
+  var html='<div class="screen"><div class="ttl"><a class="back" href="#/accueil" aria-label="Retour">‹</a><h1>Rappels de la vague</h1></div>'+
+  '<div class="sm" style="margin-bottom:10px">Ces rappels s\'affichent sur l\'accueil au bon jour. Modèle de départ : à confirmer avec votre vétérinaire.</div>'+
+  '<div id="r_list">'+l.map(row).join('')+'</div>'+
+  '<button class="btn alt" type="button" id="r_add">+ Ajouter un rappel</button><button class="btn" type="button" id="r_save">Enregistrer</button><button class="btn alt" type="button" id="r_reset">Remettre le modèle de départ</button></div>';
+  return {html:html,theme:'t-green',init:function(){
+    function collect(){var o=[];for(var i=0;i<60;i++){var a=$('#r_j'+i),t=$('#r_t'+i);if(!a||!t){break;}var j=Math.round(num(a.value)),tx=t.value.trim();if(j>0&&tx){o.push({j:j,t:tx});}}return o;}
+    app.onclick=function(e){var d=e.target.closest&&e.target.closest('[data-rdel]');if(d){var o=collect();o.splice(+d.dataset.rdel,1);cfg.vax=o;saveCfg();route();}};
+    $('#r_add').onclick=function(){var o=collect();o.push({j:1,t:'Nouveau rappel'});cfg.vax=o;saveCfg();route();};
+    $('#r_save').onclick=function(){cfg.vax=collect();saveCfg();toast('Rappels enregistrés');location.hash='#/accueil';};
+    $('#r_reset').onclick=function(){delete cfg.vax;saveCfg();route();};
+  }};
+}
+
 /* Simulateur de vagues */
 function simCalc(o){
   var vivants=Math.round(o.nb*(1-o.mort/100)),
@@ -1281,22 +1319,22 @@ function simCalc(o){
   return {vivants:vivants,kgViande:kgViande,kgAl:kgAl,sacs:kgAl/50,cAl:cAl,cPou:cPou,cTot:cTot,rev:rev,ben:ben,cPar:vivants?cTot/vivants:0,seuil:vivants?cTot/vivants:0,marge:rev?ben/rev*100:0};
 }
 function vSim(){
-  var s=cfg.sim||{nb:500,pp:600,mort:5,jours:42,poids:2.2,ic:1.75,pal:350,autres:25000,pv:3000,mode:'tete'};
+  var s=cfg.sim||{nb:500,pp:600,mort:5,jours:42,poids:2.2,ic:1.52,pal:350,autres:25000,pv:3000,mode:'tete'};
   function f(id,l,v,ph){return `<div class="fld"><label class="l" for="s_${id}">${l}</label><input class="in" id="s_${id}" type="text" inputmode="decimal" value="${esc(v)}"${ph?` placeholder="${ph}"`:''}></div>`;}
   var html=`<div class="screen"><div class="ttl"><a class="back" href="#/accueil" aria-label="Retour">‹</a><h1>Simulateur de vague</h1></div>
   <div class="sm" style="margin-bottom:10px">Calculez le bénéfice avant de commander vos poussins. Modifiez les chiffres : le résultat se met à jour.</div>
-  <div class="card">${f('nb','Nombre de poussins',s.nb)}${f('pp','Prix d\'un poussin (FCFA)',s.pp)}${f('mort','Mortalité prévue (%)',s.mort)}${f('jours','Durée d\'élevage (jours)',s.jours)}${f('poids','Poids moyen à la vente (kg)',s.poids)}${f('ic','Aliment par kg de poids gagné (indice, 1,6 à 2)',s.ic)}${f('pal','Prix du kg d\'aliment (FCFA)',s.pal)}${f('autres','Autres frais : médicaments, chauffage, main-d\'œuvre… (FCFA)',s.autres)}
+  <div class="card">${f('nb','Nombre de poussins',s.nb)}${f('pp','Prix d\'un poussin (FCFA)',s.pp)}${f('mort','Mortalité prévue (%)',s.mort)}${f('jours','Durée d\'élevage (jours)',s.jours)}${f('poids','Poids moyen à la vente (kg)',s.poids)}<div class="fld"><div class="l">Aliment par kg de poids gagné (indice) <button type="button" id="s_src" aria-label="Source" style="border:0;background:none;color:var(--green);font-size:17px;padding:0 4px">ⓘ</button></div><div class="in" id="s_ic" style="background:var(--pB);display:flex;align-items:center">${(cobbFcr(s.jours||42)).toFixed(2).replace('.',',')}</div><div class="sm" id="s_srcn" hidden>Source : Cobb500, Performance &amp; Nutrition Supplement (2022). Calcul automatique selon la durée d'élevage.</div></div>${f('pal','Prix du kg d\'aliment (FCFA)',s.pal)}${f('autres','Autres frais : médicaments, chauffage, main-d\'œuvre… (FCFA)',s.autres)}
   <div class="fld"><div class="l">Vente</div>${chips('smode',['Par poulet','Au kilo'],s.mode==='kg'?'Au kilo':'Par poulet')}</div>${f('pv','Prix de vente (FCFA par poulet ou par kg)',s.pv)}</div>
   <div class="card" id="s_res"></div>
   <button class="btn alt" type="button" id="s_sh">Partager ce calcul</button></div>`;
   return {html:html,theme:'t-green',init:function(){
     var last=null;
-    function read(){return {nb:num($('#s_nb').value),pp:num($('#s_pp').value),mort:Math.min(100,num($('#s_mort').value)),jours:num($('#s_jours').value),poids:num($('#s_poids').value),ic:num($('#s_ic').value),pal:num($('#s_pal').value),autres:num($('#s_autres').value),pv:num($('#s_pv').value),mode:chipVal('smode')==='Au kilo'?'kg':'tete'};}
+    function read(){return {nb:num($('#s_nb').value),pp:num($('#s_pp').value),mort:Math.min(100,num($('#s_mort').value)),jours:num($('#s_jours').value),poids:num($('#s_poids').value),ic:cobbFcr(num($('#s_jours').value)||42),pal:num($('#s_pal').value),autres:num($('#s_autres').value),pv:num($('#s_pv').value),mode:chipVal('smode')==='Au kilo'?'kg':'tete'};}
     function calc(){
-      var o=read();cfg.sim=o;saveCfg();var r=simCalc(o);last={o:o,r:r};
+      var o=read();cfg.sim=o;saveCfg();var r=simCalc(o);last={o:o,r:r};$('#s_ic').textContent=o.ic.toFixed(2).replace('.',',');
       var good=r.ben>=0;
       $('#s_res').innerHTML=`<div class="h2">Résultat</div><div class="big" style="color:${good?'var(--green)':'var(--red)'}">${good?'Bénéfice':'Perte'} : ${fmt(Math.abs(r.ben))} <small>FCFA</small></div>
-      <div class="line"><span>Poulets vendus</span><b>${r.vivants}</b></div><div class="line"><span>Viande produite</span><b>${fmt(r.kgViande)} kg</b></div>
+      <div class="line"><span>Poids Cobb500 à ${o.jours} jours</span><b>${o.jours>=0&&o.jours<=56?(cobbW(o.jours)/1000).toFixed(2).replace('.',',')+' kg':'—'}</b></div><div class="line"><span>Poulets vendus</span><b>${r.vivants}</b></div><div class="line"><span>Viande produite</span><b>${fmt(r.kgViande)} kg</b></div>
       <div class="line"><span>Aliment nécessaire</span><b>${fmt(r.kgAl)} kg (≈ ${(Math.round(r.sacs*10)/10).toString().replace('.',',')} sacs de 50 kg)</b></div>
       <div class="line"><span>Poussins</span><b>${fmt(r.cPou)}</b></div><div class="line"><span>Aliment</span><b>${fmt(r.cAl)}</b></div><div class="line"><span>Autres frais</span><b>${fmt(o.autres)}</b></div>
       <div class="line"><span>Total des dépenses</span><b>${fmt(r.cTot)}</b></div><div class="line"><span>Ventes attendues</span><b>${fmt(r.rev)}</b></div>
@@ -1306,6 +1344,7 @@ function vSim(){
     app.querySelectorAll('input.in').forEach(function(x){x.oninput=calc;});
     hooks.chip=function(g){if(g==='smode'){calc();}};
     $('#s_sh').onclick=function(){if(!last){return;}var o=last.o,r=last.r;shareOrCopy(`Simulation Mon Poulailler\n${o.nb} poussins, ${o.mort}% de mortalité, ${o.jours} jours\nDépenses : ${fmt(r.cTot)} FCFA\nVentes : ${fmt(r.rev)} FCFA\n${r.ben>=0?'Bénéfice':'Perte'} : ${fmt(Math.abs(r.ben))} FCFA\nSeuil de rentabilité : ${fmt(r.seuil)} FCFA par poulet`,'Calcul copié');};
+    $('#s_src').onclick=function(){var n=$('#s_srcn');n.hidden=!n.hidden;};
     calc();
   }};
 }
@@ -1766,7 +1805,7 @@ function route(){
   if(({employes:1,valider:1,activite:1,commandes:1})[r]&&st.mode!=='paid'){render(vLock('adv'),r);return;}
   if(({depense:1,saisie:1,vente:1,bande:1,oeufs:1})[r]&&st.mode==='expired'){render(vLock('ro'),r);return;}
   if(!db.bandes.length&&r!=='bande'){location.replace('#/bande/new');return;}
-  var views={accueil:vHome,depenses:vDep,depense:function(){return vDepForm(arg);},stock:vStock,saisie:vSaisie,ventes:vVentes,vente:function(){return vVenteForm(arg);},bandes:vBandes,bande:vBandeForm,valider:vValider,employes:vEmployes,commandes:vCommandes,activite:vActivite,bilan:function(){return vBilan(arg);},oeufs:vOeufs,reglages:vReglages,dettes:vDettes,climat:vClimat,simulateur:vSim,abo:vAbo};
+  var views={accueil:vHome,depenses:vDep,depense:function(){return vDepForm(arg);},stock:vStock,saisie:vSaisie,ventes:vVentes,vente:function(){return vVenteForm(arg);},bandes:vBandes,bande:vBandeForm,valider:vValider,employes:vEmployes,commandes:vCommandes,activite:vActivite,bilan:function(){return vBilan(arg);},oeufs:vOeufs,reglages:vReglages,dettes:vDettes,climat:vClimat,simulateur:vSim,rappels:vRappels,abo:vAbo};
   render((views[r]||vHome)(),r);
 }
 app.addEventListener('click',function(e){
@@ -1928,7 +1967,7 @@ function bindStat(){
 /* ---------- Centre : mises à jour + comptage des appareils ---------- */
 var CENTER={proj:'poulebox',key:'AIzaSyDaAkRRkGchPMrBw6oVKb4fhSFb2qptuWM'};
 function cenOn(){return !!(CENTER.proj&&CENTER.key);}
-var WEBVER='3.7.4 web';
+var WEBVER='3.8.0 web';
 function isWeb(){return !(window.AndroidBridge&&window.AndroidBridge.appInfo);}
 function appInfo(){if(isWeb()){return {name:WEBVER,code:999999};}try{var s=window.AndroidBridge&&window.AndroidBridge.appInfo&&window.AndroidBridge.appInfo();if(s){var a=String(s).split('|');return {name:a[0],code:parseInt(a[1],10)||0};}}catch(e){}return null;}
 function devId(){if(isWeb()){return normDev(getDev());}try{return String((window.AndroidBridge&&window.AndroidBridge.deviceId&&window.AndroidBridge.deviceId())||'').replace(/[^A-Z0-9]/g,'');}catch(e){return '';}}
