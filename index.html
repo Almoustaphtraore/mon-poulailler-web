@@ -287,8 +287,9 @@ function vReglages(){
   '<a class="btn alt" href="#/licence">Ma licence</a>'+
   '<div class="card" style="margin-top:18px"><div class="h2">Sauvegarde</div><div class="sm" style="margin-bottom:10px">Vos données sont gardées sur ce téléphone. Faites une copie de temps en temps.</div>'+
   '<div class="row"><button class="btn alt sm" type="button" data-export="1">Exporter</button><button class="btn alt sm" type="button" data-import="1">Importer</button></div>'+
-  '<input type="file" id="impfile" accept=".json,application/json" hidden></div></div>';
-  return {html:html,theme:'t-green'};
+  '<input type="file" id="impfile" accept=".json,application/json" hidden></div>'+
+  '<div class="card"><div class="h2">Statistiques anonymes</div><div class="sm" style="margin-bottom:10px">Mon Poulailler compte anonymement les utilisations pour s\'améliorer. Aucun nom, numéro de téléphone, client ni montant n\'est envoyé.</div><button class="btn alt sm" type="button" id="st_t">'+(cfg.noStat?'Désactivées · toucher pour activer':'Activées · toucher pour désactiver')+'</button></div></div>';
+  return {html:html,theme:'t-green',init:function(){var t=$('#st_t');if(t){t.onclick=function(){cfg.noStat=!cfg.noStat;saveCfg();toast(cfg.noStat?'Statistiques désactivées':'Statistiques activées');route();};}}};
 }
 
 /* ---------- Dépenses ---------- */
@@ -1271,12 +1272,13 @@ function vClimat(){
 /* Objectifs Cobb500 (Performance & Nutrition Supplement 2022), mélangé, jours 0 à 56 */
 var COBBW=[42, 55, 71, 90, 112, 138, 168, 202, 240, 283, 330, 382, 440, 503, 570, 639, 711, 786, 864, 945, 1029, 1116, 1205, 1296, 1390, 1486, 1583, 1682, 1783, 1886, 1989, 2094, 2200, 2306, 2413, 2521, 2629, 2738, 2846, 2954, 3062, 3170, 3278, 3384, 3490, 3595, 3699, 3801, 3902, 4001, 4099, 4195, 4289, 4380, 4470, 4557, 4641];
 var COBBF=[180, 220, 264, 314, 371, 435, 508, 588, 672, 763, 861, 966, 1077, 1195, 1320, 1451, 1588, 1731, 1880, 2034, 2194, 2359, 2528, 2702, 2880, 3063, 3250, 3441, 3635, 3833, 4035, 4241, 4450, 4663, 4880, 5100, 5324, 5552, 5784, 6020, 6259, 6502, 6749, 6999, 7252, 7508, 7766, 8026, 8287, 8549]; /* aliment cumulé par poulet (g), jours 7 à 56 */
+function useInc(k){if(cfg.noStat){return;}cfg.use=cfg.use||{};cfg.use[k]=(cfg.use[k]||0)+1;saveCfg();}
 function cobbDay(d){return Math.max(0,Math.min(56,Math.round(d)));}
 function cobbW(d){return COBBW[cobbDay(d)];}
 function cobbFeed(d){d=cobbDay(d);return d<7?Math.round(COBBF[0]*d/7):COBBF[d-7];}
 function cobbFcr(d){d=Math.max(7,cobbDay(d));return COBBF[d-7]/COBBW[d];}
 function cobbPhase(d){return d<=12?'Démarrage':d<=28?'Croissance 1':d<=39?'Croissance 2':'Finition';}
-var VAXDEF=[{j:1,t:'Vaccin Newcastle (poussins)'},{j:10,t:'Vaccin Gumboro'},{j:18,t:'Rappel Gumboro'},{j:22,t:'Rappel Newcastle'},{j:13,t:'Passer à l\'aliment croissance 1'},{j:29,t:'Passer à l\'aliment croissance 2'},{j:40,t:'Passer à l\'aliment finition'},{j:42,t:'Peser un échantillon : prêts à vendre ?'}];
+var VAXDEF=[{j:1,t:'B1/H120 Vaccin Newcastle'},{j:10,t:'Vaccin Gumboro'},{j:18,t:'Rappel Gumboro'},{j:22,t:'Rappel Newcastle (La Sota)'}];
 function vaxList(){var l=(cfg.vax&&cfg.vax.length)?cfg.vax:VAXDEF;return l.slice().sort(function(a,b){return a.j-b.j;});}
 function planCard(b,P){
   if(P||!b||b.fin){return '';}
@@ -1291,7 +1293,7 @@ function planCard(b,P){
   return h;
 }
 function vRappels(){
-  var l=vaxList();
+  useInc('rap');var l=vaxList();
   function row(x,i){return '<div class="card" style="padding:10px"><div class="row"><div class="fld" style="flex:0 0 80px"><label class="l" for="r_j'+i+'">Jour</label><input class="in" id="r_j'+i+'" type="text" inputmode="numeric" value="'+x.j+'"></div><div class="fld" style="flex:1"><label class="l" for="r_t'+i+'">Rappel</label><input class="in" id="r_t'+i+'" type="text" value="'+esc(x.t)+'"></div></div><button class="btn danger sm" type="button" data-rdel="'+i+'">Supprimer</button></div>';}
   var html='<div class="screen"><div class="ttl"><a class="back" href="#/accueil" aria-label="Retour">‹</a><h1>Rappels de la vague</h1></div>'+
   '<div class="sm" style="margin-bottom:10px">Ces rappels s\'affichent sur l\'accueil au bon jour. Modèle de départ : à confirmer avec votre vétérinaire.</div>'+
@@ -1319,6 +1321,7 @@ function simCalc(o){
   return {vivants:vivants,kgViande:kgViande,kgAl:kgAl,sacs:kgAl/50,cAl:cAl,cPou:cPou,cTot:cTot,rev:rev,ben:ben,cPar:vivants?cTot/vivants:0,seuil:vivants?cTot/vivants:0,marge:rev?ben/rev*100:0};
 }
 function vSim(){
+  useInc('sim');
   var s=cfg.sim||{nb:500,pp:600,mort:5,jours:42,poids:2.2,ic:1.52,pal:350,autres:25000,pv:3000,mode:'tete'};
   function f(id,l,v,ph){return `<div class="fld"><label class="l" for="s_${id}">${l}</label><input class="in" id="s_${id}" type="text" inputmode="decimal" value="${esc(v)}"${ph?` placeholder="${ph}"`:''}></div>`;}
   var html=`<div class="screen"><div class="ttl"><a class="back" href="#/accueil" aria-label="Retour">‹</a><h1>Simulateur de vague</h1></div>
@@ -1557,9 +1560,15 @@ function recuText(d){
   t+='\n'+(d.reste>0?'Reste à payer : '+fmt(d.reste)+' FCFA':'✅ PAYÉ')+'\nMerci pour votre confiance !';
   return t;
 }
+function logoSrc(){var m=/src="([^"]+)"/.exec(LOGO);return m?m[1]:'';}
 function recuImage(d,cb){
+  var im=new Image(),done=false;function go(ok){if(done){return;}done=true;recuDraw(d,cb,ok?im:null);}
+  im.onload=function(){go(true);};im.onerror=function(){go(false);};im.src=logoSrc();setTimeout(function(){go(false);},1500);
+}
+function recuDraw(d,cb,logo){
   var rows=recuRows(d),W=760,H=300+rows.length*54+(d.kind==='cmd'?170:60)+80,cv=document.createElement('canvas');cv.width=W;cv.height=H;
   var g=cv.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,W,H);g.strokeStyle='#2F6B3F';g.lineWidth=4;g.setLineDash([14,10]);g.strokeRect(20,20,W-40,H-40);g.setLineDash([]);
+  if(logo){var ws=Math.min(W-100,H-100)*0.8;g.save();g.globalAlpha=0.16;g.drawImage(logo,(W-ws)/2,(H-ws)/2,ws,ws);g.restore();}
   g.textAlign='center';g.fillStyle='#1F1F1F';g.font='bold 40px sans-serif';g.fillText(d.farm||'Mon Poulailler',W/2,95);
   g.fillStyle='#5F5F5F';g.font='26px sans-serif';if(d.ftel){g.fillText('Tél : '+d.ftel,W/2,138);}
   g.fillStyle='#2F6B3F';g.font='bold 30px sans-serif';g.fillText((d.kind==='cmd'?'COMMANDE CONFIRMÉE':'REÇU DE VENTE'),W/2,196);
@@ -1572,7 +1581,7 @@ function recuImage(d,cb){
   g.fillStyle='#5F5F5F';g.font='24px sans-serif';g.fillText('Merci pour votre confiance !',W/2,y+76);
   cv.toBlob(cb,'image/png');
 }
-function recuCard(d){return '<div class="rc"><div class="fn">'+esc(d.farm||'Mon Poulailler')+'</div>'+(d.ftel?'<div class="ft">Tél : '+esc(d.ftel)+'</div>':'<div class="ft">&nbsp;</div>')+
+function recuCard(d){return '<div class="rc" style="background:linear-gradient(rgba(255,255,255,.85),rgba(255,255,255,.85)),url(&quot;'+logoSrc()+'&quot;) center/78% auto no-repeat #fff"><div class="fn">'+esc(d.farm||'Mon Poulailler')+'</div>'+(d.ftel?'<div class="ft">Tél : '+esc(d.ftel)+'</div>':'<div class="ft">&nbsp;</div>')+
     '<div class="rt">'+(d.kind==='cmd'?'COMMANDE CONFIRMÉE':'REÇU DE VENTE')+'</div><div class="rn">N° '+esc(d.no)+'</div>'+
     recuRows(d).map(function(x){return '<div class="ln"><span>'+esc(x[0])+'</span><b>'+esc(x[1])+'</b></div>';}).join('')+
     (d.kind==='cmd'?'<div class="cd"><div class="sm">Code de commande</div><div class="c">'+ocodeFmt(d.code)+'</div><div class="sm">À présenter pour retirer ou recevoir vos poulets</div></div>':'')+
@@ -1588,6 +1597,7 @@ function sendRecuImage(d,tel){
   });
 }
 function vRecu(id){
+  useInc('recu');
   var d=recuData(id);
   if(!d){return {html:'<div class="screen"><div class="ttl"><a class="back" href="#/ventes" aria-label="Retour">‹</a><h1>Reçu</h1></div><div class="empty">Introuvable.</div></div>',theme:'t-green'};}
   var back=d.kind==='cmd'?'#/commandes':'#/ventes';
@@ -1606,6 +1616,7 @@ function vRecu(id){
   }};
 }
 function vWRecu(id){
+  useInc('recu');
   var code=ocode(id);
   var html='<div class="screen"><div class="ttl"><a class="back" href="#/accueil" aria-label="Retour">‹</a><h1>Reçu de la commande</h1></div><div id="wr"><div class="box">Chargement…</div></div></div>';
   return {html:html,theme:'t-green',init:async function(){
@@ -1628,6 +1639,7 @@ function vWRecu(id){
 /* Gérant : retrouver une commande avec son code */
 var finOrder=null;
 function vWCode(){
+  useInc('code');
   finOrder=null;
   var html='<div class="screen"><div class="ttl"><a class="back" href="#/accueil" aria-label="Retour">‹</a><h1>Retrouver une commande</h1></div>'+
   '<div class="fld"><label class="l" for="f_code">Code de commande du client</label><input class="in" id="f_code" type="text" maxlength="10" autocapitalize="characters" autocomplete="off" placeholder="ex. K7M2-4QX9" style="font-size:24px;letter-spacing:.1em;text-transform:uppercase"></div>'+
@@ -1967,16 +1979,18 @@ function bindStat(){
 /* ---------- Centre : mises à jour + comptage des appareils ---------- */
 var CENTER={proj:'poulebox',key:'AIzaSyDaAkRRkGchPMrBw6oVKb4fhSFb2qptuWM'};
 function cenOn(){return !!(CENTER.proj&&CENTER.key);}
-var WEBVER='3.8.0 web';
+var WEBVER='3.8.2 web';
 function isWeb(){return !(window.AndroidBridge&&window.AndroidBridge.appInfo);}
 function appInfo(){if(isWeb()){return {name:WEBVER,code:999999};}try{var s=window.AndroidBridge&&window.AndroidBridge.appInfo&&window.AndroidBridge.appInfo();if(s){var a=String(s).split('|');return {name:a[0],code:parseInt(a[1],10)||0};}}catch(e){}return null;}
 function devId(){if(isWeb()){return normDev(getDev());}try{return String((window.AndroidBridge&&window.AndroidBridge.deviceId&&window.AndroidBridge.deviceId())||'').replace(/[^A-Z0-9]/g,'');}catch(e){return '';}}
 async function centerPing(){
   var ai=appInfo(),id=devId(),now=Date.now();
-  if(!cenOn()||!ai||!id){return;}
+  if(!cenOn()||!ai||!id||cfg.noStat){return;}
   if(cfg.ping&&now-cfg.ping<20*3600e3){return;}
   if(!cfg.pfirst){cfg.pfirst=now;}
   var o={app:'poulailler',ver:ai.name,role:cfg.role||'',first:cfg.pfirst,last:now};
+  try{var ls0=licOn()?licState():null,u=cfg.use||{},ch=db.bandes.filter(function(x){return !isP(x);}).length,po=db.bandes.filter(isP).length;
+    o.lic=ls0?ls0.mode:'';o.vc=ch;o.vp=po;o.us=u.sim||0;o.ur=u.recu||0;o.uc=u.code||0;o.ua=u.rap||0;}catch(e){}
   var qs=Object.keys(o).map(function(k){return 'updateMask.fieldPaths='+k;}).join('&');
   try{
     var r=await fetchT(fsBase(CENTER.proj)+'/devices/'+encodeURIComponent(id)+'?'+qs+'&key='+encodeURIComponent(CENTER.key),{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(toFs(o))},12000);
@@ -2022,9 +2036,15 @@ async function cenCount(){
     if(!r.ok){throw new Error(r.status===403?'Règles Firebase à mettre à jour':'Erreur du serveur ('+r.status+')');}
     var j=await r.json();(j.documents||[]).forEach(function(d){all.push(fromFs(d.fields));});pt=j.nextPageToken||'';n++;
   }while(pt&&n<30);
-  var now=Date.now(),a30=0,a7=0,ver={},role={};
-  all.forEach(function(d){var l=+d.last||0;if(now-l<30*864e5){a30++;}if(now-l<7*864e5){a7++;}ver[d.ver||'?']=(ver[d.ver||'?']||0)+1;role[d.role||'?']=(role[d.role||'?']||0)+1;});
-  return {total:all.length,a30:a30,a7:a7,ver:ver,role:role};
+  var now=Date.now(),a30=0,a7=0,ver={},role={},n7=0,n1=0,lic={},ret7=[0,0],ret30=[0,0],use={sim:0,recu:0,code:0,rap:0},usr={sim:0,recu:0,code:0,rap:0},vc=0,vp=0;
+  all.forEach(function(d){var l=+d.last||0;if(now-l<30*864e5){a30++;}if(now-l<7*864e5){a7++;}ver[d.ver||'?']=(ver[d.ver||'?']||0)+1;role[d.role||'?']=(role[d.role||'?']||0)+1;
+    var f=+d.first||0;if(f&&now-f<7*864e5){n7++;}if(f&&now-f<864e5){n1++;}
+    if(f&&now-f>=7*864e5){ret7[1]++;if(l-f>=7*864e5){ret7[0]++;}}
+    if(f&&now-f>=30*864e5){ret30[1]++;if(l-f>=30*864e5){ret30[0]++;}}
+    if(d.lic){lic[d.lic]=(lic[d.lic]||0)+1;}
+    vc+=+d.vc||0;vp+=+d.vp||0;
+    [['sim','us'],['recu','ur'],['code','uc'],['rap','ua']].forEach(function(p){var x=+d[p[1]]||0;use[p[0]]+=x;if(x>0){usr[p[0]]++;}});});
+  return {total:all.length,a30:a30,a7:a7,ver:ver,role:role,n7:n7,n1:n1,lic:lic,ret7:ret7,ret30:ret30,use:use,usr:usr,vc:vc,vp:vp};
 }
 function cenCard(){
   return '<div class="card"><div class="h2">Utilisateurs de l\'application</div><div id="cenRes" class="sm" style="margin-bottom:10px">'+(cenOn()?'Touchez Actualiser.':'Centre non configuré dans cette version.')+'</div><button class="btn sm" type="button" id="cenBtn">Actualiser</button></div>'+
@@ -2039,7 +2059,13 @@ function cenBind(){
   b.onclick=async function(){
     var el=$('#cenRes');el.textContent='Chargement…';
     try{var c=await cenCount(),v=Object.keys(c.ver).map(function(k){return k+' : '+c.ver[k];}).join(' · '),r=Object.keys(c.role).map(function(k){return (k==='owner'?'promoteurs':k==='worker'?'gérants':'non choisi')+' : '+c.role[k];}).join(' · ');
-      el.innerHTML='<div class="big" style="color:var(--green)">'+c.total+' <small>appareil'+(c.total>1?'s':'')+' en tout</small></div><div style="margin-top:6px">Actifs ces 7 jours : <b>'+c.a7+'</b> · ces 30 jours : <b>'+c.a30+'</b></div><div style="margin-top:4px">'+esc(r)+'</div><div style="margin-top:4px">Versions : '+esc(v)+'</div>';
+      el.innerHTML='<div class="big" style="color:var(--green)">'+c.total+' <small>appareil'+(c.total>1?'s':'')+' en tout</small></div><div style="margin-top:6px">Actifs ces 7 jours : <b>'+c.a7+'</b> · ces 30 jours : <b>'+c.a30+'</b></div><div style="margin-top:4px">'+esc(r)+'</div><div style="margin-top:4px">Versions : '+esc(v)+'</div>'+
+        '<div class="h2" style="margin-top:12px">Nouveaux et fidélité</div><div>Nouveaux : <b>'+c.n1+'</b> aujourd\'hui · <b>'+c.n7+'</b> ces 7 jours</div>'+
+        '<div style="margin-top:4px">Reviennent après 7 jours : <b>'+(c.ret7[1]?Math.round(c.ret7[0]/c.ret7[1]*100)+' %':'—')+'</b> ('+c.ret7[0]+' sur '+c.ret7[1]+') · après 30 jours : <b>'+(c.ret30[1]?Math.round(c.ret30[0]/c.ret30[1]*100)+' %':'—')+'</b> ('+c.ret30[0]+' sur '+c.ret30[1]+')</div>'+
+        '<div style="margin-top:4px">Licences : '+esc(Object.keys(c.lic).map(function(k){return (k==='paid'?'payantes':k==='trial'?'essai':k==='expired'?'expirées':k)+' : '+c.lic[k];}).join(' · ')||'pas encore de données (versions 3.8.1 et plus)')+'</div>'+
+        '<div style="margin-top:4px">Vagues créées : '+c.vc+' poulets de chair · '+c.vp+' pondeuses</div>'+
+        '<div class="h2" style="margin-top:12px">Fonctions utilisées</div><div>Simulateur : <b>'+c.use.sim+'</b> fois ('+c.usr.sim+' appareils) · Reçus : <b>'+c.use.recu+'</b> ('+c.usr.recu+') · Code de commande : <b>'+c.use.code+'</b> ('+c.usr.code+') · Rappels : <b>'+c.use.rap+'</b> ('+c.usr.rap+')</div>'+
+        '<div class="sm" style="margin-top:6px">Les chiffres de fonctions et de licences viennent des appareils en version 3.8.1 ou plus.</div>';
     }catch(e){el.textContent=errMsg(e);}
   };
   $('#cenPub').onclick=async function(){
