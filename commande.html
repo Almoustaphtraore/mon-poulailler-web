@@ -8,6 +8,7 @@
 .box{background:#fff;border-radius:14px;padding:16px;margin-top:14px;box-shadow:0 2px 10px rgba(0,0,0,.06)}.big{font-size:30px;font-weight:800;color:var(--g)}
 label{display:block;font-weight:600;font-size:14px;margin:12px 0 4px}input,textarea{width:100%;font:inherit;padding:12px;border:1px solid #cfd8d1;border-radius:10px;background:#fff}
 button{width:100%;margin-top:16px;height:52px;border:0;border-radius:12px;background:var(--g);color:#fff;font:inherit;font-weight:700;font-size:17px}button:disabled{opacity:.5}
+.ck{display:flex;align-items:center;gap:10px;margin-top:12px;font-weight:600;font-size:15px}.ck input{width:22px;height:22px;flex:none;margin:0;accent-color:#2F6B3F}
 .sm{font-size:13px;color:var(--mut)}.ok{background:var(--gb);color:var(--gd)}.no{background:#FDECEC;color:var(--red)}.t{display:flex;justify-content:space-between;align-items:center}
 </style></head><body>
 <div class="hd"><h1 id="farm">Commander des poulets</h1><p>Poulets de chair</p></div>
@@ -35,11 +36,13 @@ fetch(base()+'/pub/state?key='+encodeURIComponent(K)).then(function(r){return r.
   var h='<div class="box"><div class="sm">Prix par poulet</div><div class="big">'+fmt(prix)+' FCFA</div><div class="sm" style="margin-top:6px">'+esc(STL[st]||'')+(dispo>0?' · '+dispo+' poulets disponibles':'')+'</div>'+(msg?'<div class="sm" style="margin-top:6px">'+esc(msg)+'</div>':'')+'</div>';
   if(!open){app.innerHTML=h+'<div class="box no"><b>Les commandes sont fermées pour le moment.</b><div class="sm">Revenez plus tard.</div></div>';return;}
   h+='<div class="box"><b>Votre commande</b><label for="c">Votre nom</label><input id="c" maxlength="60" autocomplete="name"><label for="t">Votre téléphone</label><input id="t" type="tel" inputmode="tel" maxlength="30" autocomplete="tel"><label for="q">Nombre de poulets</label><input id="q" type="text" inputmode="numeric"><label for="l">Date souhaitée</label><input id="l" type="date"><label for="n">Lieu de livraison / remarque</label><textarea id="n" rows="2" maxlength="200"></textarea>'+
+  '<label class="ck"><input type="checkbox" id="xp"><span>Déplumage : + 100 F par poulet</span></label><label class="ck"><input type="checkbox" id="xl"><span>Livraison chez moi : + 500 F</span></label>'+
   '<div class="t" style="margin-top:14px"><b>Total</b><span class="big" id="tot">0</span></div><button id="go" type="button">Envoyer ma commande</button><div class="sm" style="margin-top:10px">Aucun paiement en ligne. Le vendeur vous appellera pour confirmer.</div></div>';
   app.innerHTML=h;
   var qi=document.getElementById('q');
-  function calc(){var n=Math.floor(Number(qi.value.replace(/\s/g,'')))||0;document.getElementById('tot').textContent=fmt(n*prix)+' F';return n;}
-  qi.oninput=calc;
+  function ext(n){return (document.getElementById('xp').checked?100*n:0)+(document.getElementById('xl').checked&&n>0?500:0);}
+  function calc(){var n=Math.floor(Number(qi.value.replace(/\s/g,'')))||0;document.getElementById('tot').textContent=fmt(n*prix+ext(n))+' F';return n;}
+  qi.oninput=calc;document.getElementById('xp').onchange=calc;document.getElementById('xl').onchange=calc;
   document.getElementById('go').onclick=function(){
     var b=this,c=document.getElementById('c').value.trim(),t=document.getElementById('t').value.trim(),n=calc();
     if(!c||!t||!(n>0)){alert('Entrez votre nom, votre téléphone et le nombre de poulets.');return;}
@@ -47,11 +50,11 @@ fetch(base()+'/pub/state?key='+encodeURIComponent(K)).then(function(r){return r.
     var id='w'+Date.now().toString(36)+Math.random().toString(36).slice(2,8),d=new Date(),ds=d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);
     var o={id:{stringValue:id},type:{stringValue:'commande'},who:{stringValue:'Client en ligne'},date:{stringValue:ds},client:{stringValue:c.slice(0,60)},tel:{stringValue:t.slice(0,30)},qty:{integerValue:String(n)},pu:{integerValue:String(Math.round(prix))},recu:{integerValue:'0'},pay:{stringValue:'Espèces'},ts:{integerValue:String(Date.now())}};
     var l=document.getElementById('l').value,nt=document.getElementById('n').value.trim();
-    if(l){o.livr={stringValue:l};}if(nt){o.note={stringValue:nt.slice(0,200)};}
+    if(l){o.livr={stringValue:l};}var tg=(document.getElementById('xp').checked?' [Plumage]':'')+(document.getElementById('xl').checked?' [Livraison]':'');nt=(nt.slice(0,165)+tg).trim();if(nt){o.note={stringValue:nt};}
     b.disabled=true;b.textContent='Envoi…';
     fetch(base()+'/reports?documentId='+encodeURIComponent(id)+'&key='+encodeURIComponent(K),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fields:o})}).then(function(r){
       if(!r.ok){throw 0;}
-      var cd=ocodeFmt(ocode(id));app.innerHTML='<div class="box ok"><b>✓ Commande envoyée</b><div class="sm" style="color:inherit;margin-top:6px">'+n+' poulet'+(n>1?'s':'')+' · '+fmt(n*prix)+' FCFA. Le vendeur vous appellera au '+esc(t)+'.</div></div><div class="box" style="text-align:center;background:#FFF6DC"><div class="sm">Votre code de commande</div><div style="font-size:34px;font-weight:800;letter-spacing:.12em;margin:6px 0">'+cd+'</div><div class="sm">Notez ou faites une capture de ce code. Présentez-le au vendeur ou à son gérant pour retirer vos poulets. Il sera valable dès que le vendeur aura confirmé votre commande.</div></div>';
+      var cd=ocodeFmt(ocode(id));app.innerHTML='<div class="box ok"><b>✓ Commande envoyée</b><div class="sm" style="color:inherit;margin-top:6px">'+n+' poulet'+(n>1?'s':'')+' · '+fmt(n*prix+ext(n))+' FCFA'+(document.getElementById('xp').checked?' (déplumage inclus)':'')+(document.getElementById('xl').checked?' (livraison incluse)':'')+'. Le vendeur vous appellera au '+esc(t)+'.</div></div><div class="box" style="text-align:center;background:#FFF6DC"><div class="sm">Votre code de commande</div><div style="font-size:34px;font-weight:800;letter-spacing:.12em;margin:6px 0">'+cd+'</div><div class="sm">Notez ou faites une capture de ce code. Présentez-le au vendeur ou à son gérant pour retirer vos poulets. Il sera valable dès que le vendeur aura confirmé votre commande.</div></div>';
     }).catch(function(){b.disabled=false;b.textContent='Envoyer ma commande';alert('Envoi impossible. Vérifiez internet et réessayez.');});
   };
 }).catch(function(){app.innerHTML='<div class="box no">Pas de connexion internet. Réessayez.</div>';});
