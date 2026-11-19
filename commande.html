@@ -35,10 +35,12 @@ fetch(base()+'/pub/state?key='+encodeURIComponent(K)).then(function(r){return r.
   if(!f||!(prix>0)){app.innerHTML='<div class="box">Le vendeur n\'a pas encore publié son prix. Revenez plus tard ou appelez-le.</div>';return;}
   var h='<div class="box"><div class="sm">Prix par poulet</div><div class="big">'+fmt(prix)+' FCFA</div><div class="sm" style="margin-top:6px">'+esc(STL[st]||'')+(dispo>0?' · '+dispo+' poulets disponibles':'')+'</div>'+(msg?'<div class="sm" style="margin-top:6px">'+esc(msg)+'</div>':'')+'</div>';
   if(!open){app.innerHTML=h+'<div class="box no"><b>Les commandes sont fermées pour le moment.</b><div class="sm">Revenez plus tard.</div></div>';return;}
-  h+='<div class="box"><b>Votre commande</b><label for="c">Votre nom</label><input id="c" maxlength="60" autocomplete="name"><label for="t">Votre téléphone</label><input id="t" type="tel" inputmode="tel" maxlength="30" autocomplete="tel"><label for="q">Nombre de poulets</label><input id="q" type="text" inputmode="numeric"><label for="l">Date souhaitée</label><input id="l" type="date"><label for="n">Lieu de livraison / remarque</label><textarea id="n" rows="2" maxlength="200"></textarea>'+
+  h+='<div class="box"><b>Votre commande</b><div id="fid" class="sm" style="margin-top:8px;color:var(--g);font-weight:700"></div><label for="c">Votre nom</label><input id="c" maxlength="60" autocomplete="name"><label for="t">Votre téléphone</label><input id="t" type="tel" inputmode="tel" maxlength="30" autocomplete="tel"><label for="q">Nombre de poulets</label><input id="q" type="text" inputmode="numeric"><label for="l">Date souhaitée</label><input id="l" type="date"><label for="n">Lieu de livraison / remarque</label><textarea id="n" rows="2" maxlength="200"></textarea>'+
   '<label class="ck"><input type="checkbox" id="xp"><span>Déplumage : + 100 F par poulet</span></label><label class="ck"><input type="checkbox" id="xl"><span>Livraison chez moi : + 500 F</span></label>'+
   '<div class="t" style="margin-top:14px"><b>Total</b><span class="big" id="tot">0</span></div><button id="go" type="button">Envoyer ma commande</button><div class="sm" style="margin-top:10px">Aucun paiement en ligne. Le vendeur vous appellera pour confirmer.</div></div>';
   app.innerHTML=h;
+  var MC=null;try{MC=JSON.parse(localStorage.getItem('mp_client')||'null');}catch(e){}
+  if(MC&&MC.c){document.getElementById('c').value=MC.c;document.getElementById('t').value=MC.t||'';document.getElementById('fid').textContent='Bon retour '+MC.c+' ! '+(MC.n>0?'Vous avez déjà commandé '+MC.n+' fois. Merci pour votre fidélité.':'');}
   var qi=document.getElementById('q');
   function ext(n){return (document.getElementById('xp').checked?100*n:0)+(document.getElementById('xl').checked&&n>0?500:0);}
   function calc(){var n=Math.floor(Number(qi.value.replace(/\s/g,'')))||0;document.getElementById('tot').textContent=fmt(n*prix+ext(n))+' F';return n;}
@@ -54,6 +56,7 @@ fetch(base()+'/pub/state?key='+encodeURIComponent(K)).then(function(r){return r.
     b.disabled=true;b.textContent='Envoi…';
     fetch(base()+'/reports?documentId='+encodeURIComponent(id)+'&key='+encodeURIComponent(K),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fields:o})}).then(function(r){
       if(!r.ok){throw 0;}
+      try{localStorage.setItem('mp_client',JSON.stringify({c:c.slice(0,60),t:t.slice(0,30),n:((MC&&MC.n)||0)+1}));}catch(e){}
       var cd=ocodeFmt(ocode(id));app.innerHTML='<div class="box ok"><b>✓ Commande envoyée</b><div class="sm" style="color:inherit;margin-top:6px">'+n+' poulet'+(n>1?'s':'')+' · '+fmt(n*prix+ext(n))+' FCFA'+(document.getElementById('xp').checked?' (déplumage inclus)':'')+(document.getElementById('xl').checked?' (livraison incluse)':'')+'. Le vendeur vous appellera au '+esc(t)+'.</div></div><div class="box" style="text-align:center;background:#FFF6DC"><div class="sm">Votre code de commande</div><div style="font-size:34px;font-weight:800;letter-spacing:.12em;margin:6px 0">'+cd+'</div><div class="sm">Notez ou faites une capture de ce code. Présentez-le au vendeur ou à son gérant pour retirer vos poulets. Il sera valable dès que le vendeur aura confirmé votre commande.</div></div>';
     }).catch(function(){b.disabled=false;b.textContent='Envoyer ma commande';alert('Envoi impossible. Vérifiez internet et réessayez.');});
   };
