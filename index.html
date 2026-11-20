@@ -121,6 +121,27 @@ nav a{position:relative}
 .rc .st{margin-top:12px;text-align:center;font-weight:800;font-size:18px;padding:8px;border-radius:10px}
 .rc .st.ok{background:#E6F0E8;color:#1F4A2B}.rc .st.no{background:#FDECEC;color:#C62828}
 .xchk{display:flex;align-items:center;gap:10px;padding:10px 12px;margin-bottom:8px;border:1px solid var(--pB);border-radius:12px;background:#fff;font-size:15px}.xchk input{width:22px;height:22px;flex:none;accent-color:#2F6B3F}
+
+html[data-th=ciel]{--green:#2F6A9A;--greenDk:#1B4B73;--greenBg:#DCEBF8;--greenB:#C9DDF0;--greenIn:#A9C6E2;--yel:#7CF58A;--yelDk:#1B4B73;--yelBg:#E3FBE6;--yelB:#BDEFC4;--cream:#CFE3F5;--ink:#143A5C;--mut:#4C6F8F}
+html[data-th=ciel] h1,html[data-th=ciel] .big,html[data-th=ciel] .hn{font-weight:800}
+html[data-th=ciel] .card,html[data-th=ciel] .tile{border-radius:22px}
+html[data-th=ciel] .btn2{color:#143A5C}
+html[data-th=asphalte]{--green:#16181D;--greenDk:#000;--greenBg:#E9EBEF;--greenB:#DADDE3;--greenIn:#B9BEC8;--yel:#E0382B;--yelDk:#9B1E14;--yelBg:#FDECEA;--yelB:#F5C9C4;--cream:#EEF0F3;--ink:#111;--mut:#5A5F69}
+html[data-th=asphalte] h1{font-weight:800;text-transform:uppercase;letter-spacing:.01em}
+html[data-th=asphalte] .btn2{color:#fff}
+html[data-th=asphalte] .card,html[data-th=asphalte] .tile,html[data-th=asphalte] .btn,html[data-th=asphalte] .btn2,html[data-th=asphalte] .chip,html[data-th=asphalte] .in{border-radius:8px}
+html[data-th=neon]{--green:#7B3FF2;--greenDk:#CDB2FF;--greenBg:#3B3548;--greenB:#47415A;--greenIn:#5A5273;--yel:#C6F24E;--yelDk:#C6F24E;--yelBg:#3D4326;--yelB:#566033;--cream:#25232B;--ink:#F3F1F7;--mut:#ADA8BC;--amberBg:#4A3A1A;--amber:#F2C66B;--red:#FF6B6B;--redBg:#4A2630;--redDk:#FF9A9A;--redB:#63303C;--redIn:#7A3C49}
+html[data-th=neon] .card,html[data-th=neon] .tile,html[data-th=neon] .two .tile,html[data-th=neon] .kpi,html[data-th=neon] .in,html[data-th=neon] .chip,html[data-th=neon] .btn.alt,html[data-th=neon] .btn.danger,html[data-th=neon] .xchk,html[data-th=neon] .stepper button,html[data-th=neon] .top .sel,html[data-th=neon] select.in{background:#34313C!important;color:var(--ink)!important;border-color:#4A4655!important}
+html[data-th=neon] .btn.alt{color:#C6F24E!important}
+html[data-th=neon] .btn2{color:#1E2B20}
+html[data-th=neon] .hero2{background:linear-gradient(135deg,#7B3FF2,#4B1FB5)}
+html[data-th=neon] nav{background:#2E2B35;border-color:#4A4655}
+html[data-th=neon] nav a,html[data-th=neon] nav button{color:#ADA8BC}
+html[data-th=neon] nav .on,html[data-th=neon] nav [aria-current]{color:#C6F24E}
+html[data-th=neon] .al.ok span{color:#ADA8BC}
+html[data-th=neon] .box{background:#34313C;color:var(--ink)}
+.thp{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:12px 14px;margin-bottom:10px;border:2px solid var(--pB);border-radius:16px;background:var(--cream);color:var(--ink);font:inherit;font-weight:600}
+.thp.on{border-color:var(--p)}.thp i{display:inline-block;width:22px;height:22px;border-radius:50%;margin-right:-6px;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.15)}.thp .ck{margin-left:auto;font-size:20px}
 </style>
 </head>
 <body>
@@ -168,7 +189,7 @@ function wClientBind(){
 var editOrd=null;
 function latestOrd(code){
   for(var i=cfg.queue.length-1;i>=0;i--){var it=cfg.queue[i],d=it.data;if(d.type!=='commande'){continue;}
-    if(cfg.mydec&&cfg.mydec[it.id]===0){continue;}
+    if(it.rej||(cfg.mydec&&it.id in cfg.mydec&&+cfg.mydec[it.id]===0)){continue;}
     if((xMod(d.note)||ocode(it.id))===code){return d;}}
   return null;
 }
@@ -335,6 +356,8 @@ function vReglages(){
   '<a class="btn alt" href="#/employes">Gérants et envoi automatique</a>'+
   '<a class="btn alt" href="#/securite">'+(pinOn()?'🔒 Code de verrouillage (activé)':'Code de verrouillage')+'</a>'+
   '<a class="btn alt" href="#/licence">Ma licence</a>'+
+  '<a class="btn alt" href="#/apparence">🎨 Apparence (thème)</a>'+
+  '<a class="btn alt" href="#/apropos">ℹ️ À propos (version)</a>'+
   '<div class="card" style="margin-top:18px"><div class="h2">Sauvegarde</div><div class="sm" style="margin-bottom:10px">Vos données sont gardées sur ce téléphone. Faites une copie de temps en temps.</div>'+
   '<button class="btn" type="button" data-drive="1" style="margin-bottom:10px">☁️ Sauvegarder sur Google Drive</button>'+
   '<div class="sm" style="margin-bottom:10px">'+(cfg.lastBackup?'Dernière sauvegarde : <b>'+fd(cfg.lastBackup)+'</b>':'<span class="mort">Aucune sauvegarde faite pour le moment.</span>')+'<br>Touchez le bouton, puis choisissez <b>Drive</b> dans la liste et validez. Votre fichier est alors gardé en sécurité, même si le téléphone est perdu.</div>'+
@@ -1013,7 +1036,7 @@ function vWSetup(){
   }};
 }
 function vWHome(){
-  var q=pendingQ(),list=cfg.queue.filter(function(x){return !(x.data.type==='commande'&&cfg.mydec&&cfg.mydec[x.id]===0);}).reverse().slice(0,20);
+  var q=pendingQ(),list=cfg.queue.filter(function(x){return !(x.data.type==='commande'&&(x.rej||(cfg.mydec&&x.id in cfg.mydec&&+cfg.mydec[x.id]===0)));}).reverse().slice(0,20);
   var html='<div class="screen"><div class="top"><div style="display:flex;align-items:center;gap:10px"><div class="logo" style="width:44px;height:44px">'+LOGO+'</div><h1 style="font-size:22px">Bonjour '+esc(cfg.worker.who)+'</h1></div></div>'+
   (wT()==='ponte'?'':'<div class="box" style="margin-bottom:14px;display:flex;justify-content:space-between;align-items:center"><span><b>Prix du jour</b><div class="sm" style="color:var(--pDk)">'+(wPrix()?esc(wPrixNote()):(cfg.pullErr?esc(cfg.pullErr):'Pas encore reçu : ouvrez l\'application avec internet.'))+'</div></span><span class="big">'+(wPrix()?fmt(wPrix())+' <small>FCFA</small>':'—')+'</span></div>')+
   updBox()+wNoticeBox()+(wT()==='ponte'?'':wStatCard())+wDebtBox()+
@@ -1027,8 +1050,9 @@ function vWHome(){
   '<div class="sm" style="margin:6px 0 16px">Le promoteur vérifie puis valide chaque saisie.</div>'+
   '<h2 class="h2">Mes dernières saisies</h2>'+
   (list.length?list.map(function(x){var d=x.data;
-    return '<div class="item"><div class="main"><div class="t'+(d.type==='mort'?' mort':'')+'">'+repLabel(d)+'</div><div class="d">'+fd(d.date)+repDetail(d)+'</div>'+((d.type==='commande'&&cfg.mydec&&cfg.mydec[x.id]===1)?'<button class="chip sm" type="button" data-wedit="'+esc(x.id)+'" style="margin-top:6px">✏️ Modifier</button>':'')+'</div><div class="r"><span class="tag" style="background:'+(cfg.mydec&&cfg.mydec[x.id]===0?'var(--redBg,#FDECEC);color:var(--red)':(x.sent?'var(--greenBg);color:var(--greenDk)':'var(--amberBg);color:var(--amber)'))+'">'+(function(){var dv=cfg.mydec&&cfg.mydec[x.id];return dv===1?'Validée ✓':(dv===0?'Rejetée ✗':(x.sent?'Envoyé ✓':'En attente'));})()+'</span>'+(d.type==='commande'?'<a class="chip sm" href="#/wrecu/'+esc(d.id)+'" style="margin-top:6px;display:inline-block;text-decoration:none">Reçu</a>':'')+'</div></div>';}).join(''):'<div class="empty">Aucune saisie pour le moment.</div>')+
+    return '<div class="item"><div class="main"><div class="t'+(d.type==='mort'?' mort':'')+'">'+repLabel(d)+'</div><div class="d">'+fd(d.date)+repDetail(d)+'</div>'+((d.type==='commande'&&cfg.mydec&&+cfg.mydec[x.id]===1)?'<button class="chip sm" type="button" data-wedit="'+esc(x.id)+'" style="margin-top:6px">✏️ Modifier</button>':'')+'</div><div class="r"><span class="tag" style="background:'+(cfg.mydec&&cfg.mydec[x.id]===0?'var(--redBg,#FDECEC);color:var(--red)':(x.sent?'var(--greenBg);color:var(--greenDk)':'var(--amberBg);color:var(--amber)'))+'">'+(function(){var dv=cfg.mydec&&cfg.mydec[x.id];return dv===1?'Validée ✓':(dv===0?'Rejetée ✗':(x.sent?'Envoyé ✓':'En attente'));})()+'</span>'+(d.type==='commande'?'<a class="chip sm" href="#/wrecu/'+esc(d.id)+'" style="margin-top:6px;display:inline-block;text-decoration:none">Reçu</a>':'')+'</div></div>';}).join(''):'<div class="empty">Aucune saisie pour le moment.</div>')+
   '<a class="btn alt" href="#/securite" style="margin-top:16px">'+(pinOn()?'🔒 Code de verrouillage (activé)':'Code de verrouillage')+'</a>'+
+  '<a class="btn alt" href="#/apparence" style="margin-top:8px">🎨 Apparence (thème)</a><a class="btn alt" href="#/apropos">ℹ️ À propos (version)</a>'+
   '<div style="margin-top:20px"><button class="chip sm" type="button" data-wreset="1">Changer de configuration</button></div></div>';
   return {html:html,theme:'t-green',init:function(){
     workerFlush(true).then(function(n){if(n&&onWHome()&&!typing()){route();}});
@@ -1930,7 +1954,27 @@ function render(o,r){
   lastRoute=location.hash;
   window.scrollTo(0,y);
 }
+var THEMES=[{k:'vert',n:'Vert (classique)',d:'Le thème actuel',c:['#2F6B3F','#F2B01E','#FBF8EE'],m:'#2F6B3F'},{k:'ciel',n:'Ciel',d:'Bleu clair, vert fluo, coins arrondis',c:['#2F6A9A','#7CF58A','#CFE3F5'],m:'#2F6A9A'},{k:'asphalte',n:'Asphalte',d:'Noir et rouge, style affirmé',c:['#16181D','#E0382B','#EEF0F3'],m:'#16181D'},{k:'neon',n:'Néon',d:'Sombre, violet et vert citron',c:['#7B3FF2','#C6F24E','#25232B'],m:'#25232B'}];
+function applyTheme(){var t=cfg.theme||'vert',ok=THEMES.filter(function(x){return x.k===t;})[0]||THEMES[0];document.documentElement.setAttribute('data-th',ok.k);var m=document.querySelector('meta[name=theme-color]');if(m){m.setAttribute('content',ok.m);}}
+function themePicker(){return THEMES.map(function(t){var on=(cfg.theme||'vert')===t.k;return '<button type="button" class="thp'+(on?' on':'')+'" data-theme="'+t.k+'"><span>'+t.c.map(function(c){return '<i style="background:'+c+'"></i>';}).join('')+'</span><span style="margin-left:10px"><b>'+esc(t.n)+'</b><div class="sm" style="font-weight:400">'+esc(t.d)+'</div></span>'+(on?'<span class="ck">✓</span>':'')+'</button>';}).join('');}
+function vApparence(){
+  var back=cfg.role==='worker'?'#/accueil':'#/reglages';
+  return {html:'<div class="screen"><div class="ttl"><a class="back" href="'+back+'" aria-label="Retour">‹</a><h1>Apparence</h1></div><div class="sm" style="margin-bottom:12px">Choisissez les couleurs de l\'application. Cela ne change aucune donnée.</div>'+themePicker()+'</div>',theme:'t-green'};
+}
+function vApropos(){
+  var ai=appInfo(),web=isWeb(),u=cfg.upd,nm=ai?ai.name:'?',role=cfg.role==='worker'?'Gérant':(cfg.role==='owner'?'Promoteur':'—');
+  var old=!!(u&&ai&&u.v>ai.code&&!web);
+  var ln=function(a,b){return '<div class="line"><span>'+a+'</span><b>'+b+'</b></div>';};
+  var html='<div class="screen"><div class="ttl"><a class="back" href="'+(cfg.role==='worker'?'#/accueil':'#/reglages')+'" aria-label="Retour">‹</a><h1>À propos</h1></div>'+
+  '<div class="card" style="text-align:center"><div class="logo" style="width:84px;height:84px;margin:0 auto 10px">'+LOGO+'</div><div style="font-size:22px;font-weight:800">Mon Poulailler</div><div class="sm">Gestion d\'élevage de poulets</div>'+
+  '<div class="big" style="margin-top:10px">Version '+esc(String(nm).replace(' web',''))+'</div>'+(old?'<div class="box yelbox" style="margin-top:10px"><b>Une mise à jour est disponible : '+esc(u.name||'')+'</b></div>':'<div class="sm" style="margin-top:6px;color:var(--pDk)">'+(web?'Version web / iPhone':'✓ Vous utilisez la dernière version connue')+'</div>')+'</div>'+
+  '<div class="card"><div class="h2">Détails</div>'+ln('Numéro de version',esc(String(nm)))+(ai&&!web?ln('Numéro interne (build)',ai.code):'')+ln('Plateforme',web?'Web / iPhone':'Android')+ln('Rôle de ce téléphone',role)+ln('Code du téléphone',esc(String(devId()||getDev())))+'</div>'+
+  '<div class="card"><div class="h2">Contact</div><div class="sm">'+esc(CONTACT.replace('Pour obtenir votre clé, contactez le vendeur : ',''))+'</div><div class="sm" style="margin-top:6px">Pour une aide ou une clé de licence, donnez la version et le code du téléphone ci-dessus.</div></div>'+
+  '<a class="btn alt" href="#/apparence">🎨 Apparence (thème)</a></div>';
+  return {html:html,theme:'t-green'};
+}
 function route(){
+  applyTheme();
   var parts=(location.hash||'#/accueil').split('/'),r=parts[1]||'accueil',arg=parts[2];
   hooks={};curRoute=r;
   if(r==='vendeur'){render(vVendeur(),r);return;}
@@ -1942,11 +1986,14 @@ function route(){
   if(r==='securite'&&cfg.role){render(vSecurite(),r);return;}
   if(r!=='wvente'&&r!=='wcode'){finOrder=null;}
   if(r!=='wcmd'){editOrd=null;}
+  if(cfg.role==='worker'&&(r==='apropos'||r==='apparence')){render(r==='apropos'?vApropos():vApparence(),r);return;}
   if(cfg.role==='worker'){
     if(!cfg.worker&&r!=='wsetup'){location.replace('#/wsetup');return;}
     var wv={wsetup:vWSetup,wcode:vWCode,wrecu:function(){return vWRecu(arg);},wmort:vWMort,wvente:function(){return vWVente('');},woeuf:vWOeuf,woeufv:function(){return vWVente('oeuf');},wcmd:vWCmd,wdettes:vWDettes};
     render((wv[r]||vWHome)(),r);return;
   }
+  if(r==='apropos'){render(vApropos(),r);return;}
+  if(r==='apparence'){render(vApparence(),r);return;}
   if(r==='recu'){render(vRecu(arg),r);return;}
   if(r==='licence'){render(vLicence(),r);return;}
   var st=licState();
@@ -1978,6 +2025,8 @@ app.addEventListener('click',function(e){
     db.bandes=db.bandes.filter(function(x){return x.id!==id;});
     ['depenses','morts','distrib','ventes','oeufs'].forEach(function(k){db[k]=(db[k]||[]).filter(function(x){return x.b!==id;});});
     if(db.cur===id){db.cur=null;}save();publishState(true);route();}return;}
+  var thb=t.closest('[data-theme]');
+  if(thb){cfg.theme=thb.dataset.theme;saveCfg();applyTheme();toast('Thème appliqué');route();return;}
   if(t.closest('[data-drive]')){
     var fn='poulebox-sauvegarde-'+todayISO()+'.json',js=JSON.stringify(db),done=function(){cfg.lastBackup=todayISO();saveCfg();toast('Sauvegarde envoyée. Vérifiez qu\'elle est dans Drive.');route();};
     if(window.AndroidBridge&&window.AndroidBridge.shareFile){window.AndroidBridge.shareFile(fn,js);done();return;}
@@ -2120,7 +2169,7 @@ function bindStat(){
 /* ---------- Centre : mises à jour + comptage des appareils ---------- */
 var CENTER={proj:'poulebox',key:'AIzaSyDaAkRRkGchPMrBw6oVKb4fhSFb2qptuWM'};
 function cenOn(){return !!(CENTER.proj&&CENTER.key);}
-var WEBVER='3.9.1 web';
+var WEBVER='3.9.2 web';
 function isWeb(){return !(window.AndroidBridge&&window.AndroidBridge.appInfo);}
 function appInfo(){if(isWeb()){return {name:WEBVER,code:999999};}try{var s=window.AndroidBridge&&window.AndroidBridge.appInfo&&window.AndroidBridge.appInfo();if(s){var a=String(s).split('|');return {name:a[0],code:parseInt(a[1],10)||0};}}catch(e){}return null;}
 function devId(){if(isWeb()){return normDev(getDev());}try{return String((window.AndroidBridge&&window.AndroidBridge.deviceId&&window.AndroidBridge.deviceId())||'').replace(/[^A-Z0-9]/g,'');}catch(e){return '';}}
@@ -2393,7 +2442,7 @@ async function workerPullDebt(){
     try{ls=JSON.parse(s.lines||'[]');}catch(e){}
     var dm={};try{JSON.parse(s.dec||'[]').forEach(function(x){dm[x[0]]=x[1];});}catch(e){}
     var od=cfg.mydec,nw=0,rj=0;if(od){Object.keys(dm).forEach(function(k){if(!(k in od)){if(dm[k]){nw++;}else{rj++;}}});}
-    var oldDec=JSON.stringify(cfg.mydec);cfg.mydec=dm;cfg.queue=cfg.queue.filter(function(x){return !(x.data.type==='commande'&&dm[x.id]===0);});
+    var oldDec=JSON.stringify(cfg.mydec);cfg.mydec=dm;cfg.queue.forEach(function(x){if(x.data.type==='commande'&&(x.id in dm)&&+dm[x.id]===0){x.rej=1;}});cfg.queue=cfg.queue.filter(function(x){return !x.rej;});
     if(nw||rj){setNotice((nw?nw+' saisie'+(nw>1?'s validée':' validée')+(nw>1?'s':''):'')+(nw&&rj?' · ':'')+(rj?rj+' rejetée'+(rj>1?'s':''):''));}
     var oldh=JSON.stringify([cfg.mydebt&&cfg.mydebt.total,cfg.mydebt&&cfg.mydebt.lines,JSON.parse(oldDec||'null')]),had=!!cfg.mydebt;
     cfg.mydebt={total:Math.max(0,+s.total||0),lines:ls.slice(0,60),ts:s.ts||0,got:Date.now()};cfg.mydebtErr='';saveCfg();return !had||oldh!==JSON.stringify([cfg.mydebt.total,cfg.mydebt.lines,cfg.mydec]);
