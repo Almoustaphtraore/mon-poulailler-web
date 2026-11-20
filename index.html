@@ -310,6 +310,21 @@ function applyStk(stk,sign){
 }
 
 /* ---------- Accueil ---------- */
+function demoLoad(){
+  var d=function(n){var x=new Date();x.setDate(x.getDate()-n);return new Date(x.getTime()-x.getTimezoneOffset()*6e4).toISOString().slice(0,10);};
+  var b={id:uid(),nom:'Exemple : 200 poulets',date:d(16),nb:200};
+  db.bandes=[b];db.cur=b.id;
+  db.depenses=[{id:uid(),ts:Date.now(),b:b.id,date:d(16),cat:'Poussins',desig:"Poussins d'un jour",qty:200,unit:'unité',pu:700,total:140000,four:'',pay:'Espèces',note:''},
+    {id:uid(),ts:Date.now(),b:b.id,date:d(14),cat:'Aliment',desig:'Aliment démarrage',qty:4,unit:'sac',pu:17000,total:68000,four:'',pay:'Espèces',note:''},
+    {id:uid(),ts:Date.now(),b:b.id,date:d(9),cat:'Santé',desig:'Vaccins et vitamines',qty:1,unit:'lot',pu:9000,total:9000,four:'',pay:'Espèces',note:''}];
+  db.morts=[{id:uid(),b:b.id,date:d(10),n:3,cause:'Chaleur',note:''},{id:uid(),b:b.id,date:d(5),n:2,cause:'Maladie',note:''}];
+  db.ventes=[];db.commandes=[];db.pending=[];db.stock=[];db.demo=1;
+  save();toast('Exemple chargé : touchez les onglets pour explorer');location.hash='#/accueil';route();
+}
+function demoEnd(){
+  db.bandes=[];db.depenses=[];db.morts=[];db.ventes=[];db.commandes=[];db.pending=[];db.stock=[];db.distrib=[];db.cur='';delete db.demo;
+  cfg.role='';saveCfg();save();toast("Exemple supprimé : créez votre vraie vague");location.hash='#/bande/new';route();
+}
 function vHome(){
   var b=curBande(),s=stats(b),alerts=[],P=isP(b);
   db.stock.forEach(function(i){if(i.qty<=i.seuil){alerts.push('Stock bas : '+esc(i.nom)+' ('+itemQty(i)+')');}});
@@ -337,7 +352,7 @@ function vHome(){
     chip('#/bilan','Bilan')+chip('#/dettes','Dettes')+(P?'':chip('#/clients','Clients'))+(P?'':chip('#/simulateur','Simulateur')+chip('#/climat','Météo'))+chip('#/employes','Gérants')+chip('#/securite',pinOn()?'🔒 Verrouillage':'Verrouillage')+chip('#/reglages','Réglages')+'</div>';
   var html='<div class="screen"><div class="hdr"><div style="display:flex;align-items:center;gap:10px;min-width:0"><div class="logo" style="width:40px;height:40px;box-shadow:0 0 0 2px var(--yel);border-radius:12px;flex:none">'+LOGO+'</div><div style="min-width:0"><div style="font-weight:700;font-size:17px;line-height:1.1">Mon Poulailler</div><div class="sm">'+sub+'</div></div></div>'+bsel()+'</div>'+
   (db.pending.length?'<a class="box" href="#/valider" style="display:block;text-decoration:none;margin-bottom:14px;background:var(--amberBg);color:var(--amber)"><b>'+db.pending.length+' saisie'+(db.pending.length>1?'s':'')+' des gérants à valider</b><div class="sm" style="color:var(--amber)">Touchez pour vérifier et valider</div></a>':'')+
-  updBox()+lic+
+  (db.demo?'<div class="box yelbox" style="margin-bottom:14px"><b>Mode exemple</b><div class="sm" style="color:var(--yelDk);margin:4px 0">Ces chiffres sont fictifs. Explorez librement, puis démarrez avec votre vrai élevage.</div><button class="btn yel sm" type="button" data-demoend="1" style="margin-top:6px">Commencer mon vrai élevage</button></div>':'')+updBox()+lic+
   (((!cfg.lastBackup||(Date.now()-new Date(cfg.lastBackup).getTime())>14*864e5)&&db.ventes.length+db.depenses.length>3)?'<a class="box" href="#/reglages" style="display:block;text-decoration:none;margin-bottom:14px;background:var(--amberBg);color:var(--amber)"><b>☁️ Pensez à sauvegarder sur Google Drive</b><div class="sm" style="color:var(--amber)">'+(cfg.lastBackup?'Dernière sauvegarde il y a plus de 14 jours.':'Vous n\'avez encore jamais fait de sauvegarde.')+' Touchez ici.</div></a>':'')+
   '<div class="hero2"><div class="hrow"><div><div class="hl">'+(P?'Pondeuses vivantes':'Poulets vivants')+'</div><div class="hn">'+s.alive+'</div><div class="hs">sur '+b.nb+' · jour '+dayN(b)+(b.fin?' · terminée':'')+'</div></div><div class="ring"><b>'+live+' %</b><span>survie</span></div></div>'+
   '<div class="hk"><div><i>Dépenses</i><b>'+fmt(s.depT)+'</b></div><div><i>Ventes</i><b>'+fmt(s.venT)+'</b></div><div><i>'+(loss?'Perte':'Bénéfice')+'</i><b style="color:'+(loss?'#FFB3A8':'#fff')+'">'+fmt(Math.abs(s.profit))+'</b></div></div>'+
@@ -621,13 +636,15 @@ function vBandes(){
 }
 function vBandeForm(){
   var first=!db.bandes.length;
-  var html='<div class="screen">'+(first?'<div class="welcome"><div class="logo" data-vtap="1">'+LOGO+'</div><h1>Bienvenue dans Mon Poulailler</h1><p>Gérez vos poulets de chair et vos pondeuses : dépenses, stock, mortalité, ponte et ventes.</p></div>':'<div class="ttl"><a class="back" href="#/bandes" aria-label="Retour">‹</a><h1>Nouvelle vague</h1></div>')+
+  var html='<div class="screen">'+(first?'<div class="welcome"><div class="logo" data-vtap="1">'+LOGO+'</div><h1>Bienvenue dans Mon Poulailler</h1><p>Gérez vos poulets de chair et vos pondeuses : dépenses, stock, mortalité, ponte et ventes.</p></div>'+((cfg.pfirst&&Date.now()-cfg.pfirst>18*36e5)?'<div class="box yelbox" style="margin-bottom:12px"><b>Bon retour !</b><div class="sm" style="color:var(--yelDk)">Remplissez les deux cases ci-dessous et touchez « Commencer » : votre première vague est prête en 1 minute.</div></div>':''):'<div class="ttl"><a class="back" href="#/bandes" aria-label="Retour">‹</a><h1>Nouvelle vague</h1></div>')+
   '<form id="f" onsubmit="return false"><div class="fld"><div class="l">Type d\'élevage</div>'+chips('typ',['Poulets de chair','Pondeuses'],'Poulets de chair')+'</div><div class="fld"><label class="l" for="f_nom">Nom de la vague</label><input class="in" id="f_nom" type="text" value="Vague '+(db.bandes.length+1)+'"></div>'+
   '<div class="row fld"><div><label class="l" for="f_date" id="l_date">Date d\'arrivée des poussins</label><input class="in" id="f_date" type="date" value="'+todayISO()+'"></div><div><label class="l" for="f_nb" id="l_nb">Nombre de poussins</label><input class="in" id="f_nb" type="text" inputmode="numeric" placeholder="ex. : 500"></div></div>'+
   '<div class="fld"><label class="l" for="f_pu" id="l_pu">Prix d\'un poussin en FCFA (facultatif)</label><input class="in" id="f_pu" type="text" inputmode="decimal" placeholder="ex. : 900"><div class="sm" style="margin-top:6px" id="l_pn">Si vous le remplissez, l\'achat des poussins est ajouté aux dépenses.</div></div>'+
   '<div class="fld" id="w_age" style="display:none"><label class="l" for="f_age">Âge à l\'arrivée en semaines (facultatif)</label><input class="in" id="f_age" type="text" inputmode="numeric" placeholder="ex. : 18 (pondeuses prêtes à pondre)"></div>'+
   '<button class="btn" type="button" id="save">'+(first?'Commencer':'Créer la vague')+'</button></form>'+
-  (first?'<div class="card" style="margin-top:14px"><div class="sm" style="margin-bottom:8px">Vous avez déjà une sauvegarde ?</div><button class="btn alt sm" type="button" data-import="1">Importer une sauvegarde</button><input type="file" id="impfile" accept=".json,application/json" hidden></div>':'')+'</div>';
+  (first?'<button class="btn alt" type="button" data-demo="1" style="margin-top:12px">👀 Voir un exemple (sans rien saisir)</button><div class="sm" style="text-align:center;margin:8px 0 14px">Un élevage fictif pour découvrir l\'application en 1 minute.</div>':'')+
+  (first?'<div class="card" style="margin-top:6px"><div class="sm" style="margin-bottom:8px">Vous avez déjà une sauvegarde ?</div><button class="btn alt sm" type="button" data-import="1">Importer une sauvegarde</button><input type="file" id="impfile" accept=".json,application/json" hidden></div>':'')+
+  (first?'<div style="text-align:center;margin-top:16px"><button class="chip sm" type="button" data-role="worker">J\'ai un code de gérant</button></div>'+iosHint()+'<div class="sm" style="text-align:center;margin-top:10px">Un identifiant anonyme du téléphone et la version de l\'application sont envoyés une fois par jour pour compter les utilisateurs. Aucune donnée d\'élevage n\'est envoyée.</div>':'')+'</div>';
   return {html:html,theme:'t-green',init:function(){
     var tp=function(){return chipVal('typ')==='Pondeuses';};
     hooks.chip=function(g){if(g!=='typ'){return;}var p=tp();
@@ -1980,8 +1997,9 @@ function route(){
   if(r==='vendeur'){render(vVendeur(),r);return;}
   if(!cfg.role){
     if(db.bandes.length){cfg.role='owner';saveCfg();}
-    else if(r!=='role'){location.replace('#/role');return;}
-    else{render(vRole(),r);return;}
+    else if(r==='role'){render(vRole(),r);return;}
+    else if(r==='wsetup'||r==='apropos'||r==='apparence'){}
+    else if(!(r==='bande'&&arg==='new')){location.replace('#/bande/new');return;}
   }
   if(r==='securite'&&cfg.role){render(vSecurite(),r);return;}
   if(r!=='wvente'&&r!=='wcode'){finOrder=null;}
@@ -2027,6 +2045,9 @@ app.addEventListener('click',function(e){
     if(db.cur===id){db.cur=null;}save();publishState(true);route();}return;}
   var thb=t.closest('[data-theme]');
   if(thb){cfg.theme=thb.dataset.theme;saveCfg();applyTheme();toast('Thème appliqué');route();return;}
+  if(t.closest('[data-webreload]')){webReload();return;}
+  if(t.closest('[data-demo]')){demoLoad();return;}
+  if(t.closest('[data-demoend]')){if(confirm("Cela supprime l'exemple et ouvre la création de votre vraie vague. Continuer ?")){demoEnd();}return;}
   if(t.closest('[data-drive]')){
     var fn='poulebox-sauvegarde-'+todayISO()+'.json',js=JSON.stringify(db),done=function(){cfg.lastBackup=todayISO();saveCfg();toast('Sauvegarde envoyée. Vérifiez qu\'elle est dans Drive.');route();};
     if(window.AndroidBridge&&window.AndroidBridge.shareFile){window.AndroidBridge.shareFile(fn,js);done();return;}
@@ -2169,7 +2190,7 @@ function bindStat(){
 /* ---------- Centre : mises à jour + comptage des appareils ---------- */
 var CENTER={proj:'poulebox',key:'AIzaSyDaAkRRkGchPMrBw6oVKb4fhSFb2qptuWM'};
 function cenOn(){return !!(CENTER.proj&&CENTER.key);}
-var WEBVER='3.9.2 web';
+var WEBVER='3.10.0 web';
 function isWeb(){return !(window.AndroidBridge&&window.AndroidBridge.appInfo);}
 function appInfo(){if(isWeb()){return {name:WEBVER,code:999999};}try{var s=window.AndroidBridge&&window.AndroidBridge.appInfo&&window.AndroidBridge.appInfo();if(s){var a=String(s).split('|');return {name:a[0],code:parseInt(a[1],10)||0};}}catch(e){}return null;}
 function devId(){if(isWeb()){return normDev(getDev());}try{return String((window.AndroidBridge&&window.AndroidBridge.deviceId&&window.AndroidBridge.deviceId())||'').replace(/[^A-Z0-9]/g,'');}catch(e){return '';}}
@@ -2180,7 +2201,7 @@ async function centerPing(){
   if(!cfg.pfirst){cfg.pfirst=now;}
   var o={app:'poulailler',ver:ai.name,role:cfg.role||'',first:cfg.pfirst,last:now};
   try{var ls0=licOn()?licState():null,u=cfg.use||{},ch=db.bandes.filter(function(x){return !isP(x);}).length,po=db.bandes.filter(isP).length;
-    o.lic=ls0?ls0.mode:'';o.vc=ch;o.vp=po;o.us=u.sim||0;o.ur=u.recu||0;o.uc=u.code||0;o.ua=u.rap||0;}catch(e){}
+    o.lic=ls0?ls0.mode:'';o.vc=db.demo?0:ch;o.vp=db.demo?0:po;o.us=u.sim||0;o.ur=u.recu||0;o.uc=u.code||0;o.ua=u.rap||0;}catch(e){}
   var qs=Object.keys(o).map(function(k){return 'updateMask.fieldPaths='+k;}).join('&');
   try{
     var r=await fetchT(fsBase(CENTER.proj)+'/devices/'+encodeURIComponent(id)+'?'+qs+'&key='+encodeURIComponent(CENTER.key),{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(toFs(o))},12000);
@@ -2198,7 +2219,22 @@ async function updCheck(){
   }catch(e){}
   return false;
 }
+var webNew='';
+async function webVerCheck(){
+  if(!isWeb()||!/^https?:/.test(location.protocol)){return;}
+  try{var r=await fetch('./version.json?t='+Date.now(),{cache:'no-store'});if(!r.ok){return;}var j=await r.json(),v=String(j.v||'');
+    if(v&&v!==WEBVER&&v!==webNew){webNew=v;if(curRoute==='accueil'){route();}}}catch(e){}
+}
+document.addEventListener('visibilitychange',function(){if(!document.hidden){webVerCheck();}});
+setTimeout(webVerCheck,2500);
+function webReload(){
+  var go=function(){location.reload();};
+  try{var jobs=[];if(window.caches){jobs.push(caches.keys().then(function(k){return Promise.all(k.map(function(x){return caches.delete(x);}));}));}
+    if(navigator.serviceWorker){jobs.push(navigator.serviceWorker.getRegistrations().then(function(rs){return Promise.all(rs.map(function(x){return x.unregister();}));}));}
+    Promise.all(jobs).then(go,go);}catch(e){go();}
+}
 function updBox(){
+  if(isWeb()&&webNew){return '<div class="box yelbox" style="margin-bottom:14px"><b>Nouvelle version '+esc(webNew.replace(' web',''))+' disponible</b><div class="sm" style="color:var(--yelDk);margin:4px 0">Touchez pour recharger : vos données sont conservées.</div><button class="btn yel sm" type="button" data-webreload="1" style="margin-top:8px">Mettre à jour maintenant</button></div>';}
   var ai=appInfo(),u=cfg.upd;if(!u||!ai||!(u.v>ai.code)){return '';}
   return '<div class="box yelbox" style="margin-bottom:14px"><b>Nouvelle version '+esc(u.name)+' disponible</b>'+(u.notes?'<div class="sm" style="color:var(--yelDk);margin:4px 0">'+esc(u.notes)+'</div>':'')+'<button class="btn yel sm" type="button" data-upd="1" style="margin-top:8px">Télécharger la mise à jour</button><div class="sm" style="color:var(--yelDk);margin-top:6px">Ouvrez le fichier téléchargé puis touchez « Installer ». Vos données sont conservées.</div></div>';
 }
