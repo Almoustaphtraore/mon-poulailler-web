@@ -247,8 +247,8 @@ function stats(b){
   var dep=db.depenses.filter(function(x){return x.b===b.id;}),ve=db.ventes.filter(function(x){return x.b===b.id;}),mo=db.morts.filter(function(x){return x.b===b.id;});
   var vf=ve.filter(function(x){return x.prod!=='oeuf'&&xTags(x.note).fr;}),vp=ve.filter(function(x){return x.prod!=='oeuf'&&!xTags(x.note).fr;}),vo=ve.filter(function(x){return x.prod==='oeuf';}),oe=(db.oeufs||[]).filter(function(x){return x.b===b.id;});
   var fIn=sum(mo.filter(function(x){return x.cause===FRI;}),'n'),fS=sum(vf,'qty'),dead=sum(mo,'n'),sold=sum(vp,'qty'),depT=sum(dep,'total'),venT=sum(ve,'total'),venP=sum(vp,'total');
-  var rec=sum(oe,'n'),cas=sum(oe,'casses'),pl=sum(vo,'qty');
-  return {fr:{in:fIn,sold:fS,stock:Math.max(0,fIn-fS),rec:sum(vf,'total')},dep:dep,ve:ve,mo:mo,vp:vp,vo:vo,oe:oe,rec:rec,cas:cas,pl:pl,oStock:Math.max(0,rec-cas-pl*30),venP:venP,venO:sum(vo,'total'),dead:dead,sold:sold,alive:Math.max(0,b.nb-dead-sold),depT:depT,venT:venT,
+  var rec=sum(oe,'n'),cas=sum(oe,'casses'),pl=sum(vo,'qty'),hvL=(db.oeufsHV||[]).filter(function(x){return x.b===b.id;}),hv=sum(hvL,'n');
+  return {fr:{in:fIn,sold:fS,stock:Math.max(0,fIn-fS),rec:sum(vf,'total')},dep:dep,ve:ve,mo:mo,vp:vp,vo:vo,oe:oe,rec:rec,cas:cas,pl:pl,oStock:Math.max(0,rec-cas-pl*30-hv),hv:hv,hvL:hvL,venP:venP,venO:sum(vo,'total'),dead:dead,sold:sold,alive:Math.max(0,b.nb-dead-sold),depT:depT,venT:venT,
     profit:venT-depT,rate:b.nb?dead/b.nb*100:0,costPlaced:b.nb?depT/b.nb:0,costSold:sold?depT/sold:0,avgPrice:sold?venP/sold:0};
 }
 function isP(b){return !!b&&b.type==='ponte';}
@@ -264,6 +264,69 @@ function pBandDef(){
 }
 function wT(){var t=cfg.state&&cfg.state.types;return (t==='ponte'||t==='both')?t:'chair';}
 function plat(n){n=Math.max(0,Math.round(n||0));var p=Math.floor(n/30),r=n%30;return p+' plateau'+(p>1?'x':'')+(r?' + '+r+' œuf'+(r>1?'s':''):'');}
+var LEG={w0:18,hdO:[0,4,21,55,78,89,92,93,94,94,94,94,94,94,94,94,93,93,93,93,92,92,91,91,91,90,90,89,89,89,88,87,87,87,86,86,85,85,85,84,84,83,83,83,82,82,81,81,80,80,80,80,80,80,80,80,79,79,78,78,77,76,75],hdA:[1,3,15,38,62,78,86,90,91,92,93,92,92,92,92,92,91,91,91,90,90,90,89,89,88,88,87,87,87,86,85,85,85,84,83,83,83,82,82,81,81,81,80,80,79,78,78,77,77,76,76,76,76,75,75,75,74,74,74,72,72,71,70],egg:[43.2,44.3,45.8,47.4,49.6,51.4,52.9,53.9,54.9,55.5,56.3,56.9,57.5,57.8,58.2,58.5,58.9,59.2,59.5,59.8,60.1,60.2,60.4,60.6,60.8,60.9,61.0,61.1,61.1,61.2,61.3,61.3,61.3,61.5,61.6,61.6,61.7,61.8,62.0,62.0,62.1,62.2,62.2,62.3,62.3,62.5,62.5,62.6,62.6,62.6,62.7,62.9,62.9,63.1,63.1,63.1,63.4,63.5,63.5,63.8,63.8,63.9,63.9],feed:[64,65,67,69,75,80,84,87,89,90,90,91,91,92,93,93,94,94,95,95,95,96,96,96,95,95,95,95,95,95,95,95,95,95,95,94,94,94,94,94,94,94,94,94,93,93,93,93,93,93,93,93,93,93,93,93,93,93,93,93,93,93,93],gBW:[65,110,170,250,320,410,500,590,690,790,870,940,1020,1090,1160,1200,1240],gF:[13,16,19,29,38,41,43,46,48,51,53,54,56,57,59,61,62]};
+function pAge(b){if(!b||!b.age0){return 0;}return b.age0+Math.floor((Date.parse(todayISO())-Date.parse(b.date))/6048e5);}
+function legAt(age){if(!(age>=18)){return null;}var i=Math.min(62,age-LEG.w0);return {hdA:LEG.hdA[i],hdO:LEG.hdO[i],egg:LEG.egg[i],feed:LEG.feed[i]};}
+function ponteExtra(b,s,pi){
+  var age=pAge(b),t=legAt(age),X={age:age,t:t};
+  var pr=s.pl>0?s.venO/s.pl:0;X.pr=pr;X.margin=(pr>0&&pi.costPl>0)?pr-pi.costPl:null;
+  var d7=Date.now()-7*864e5,fk=sum((db.distrib||[]).filter(function(x){return x.b===b.id&&x.ts>=d7;}),'kg');
+  X.fgh=(fk>0&&s.alive>0)?fk*1000/7/s.alive:0;
+  X.reform=!!(b&&!b.fin&&((age>=72)||(pi.list.length>=7&&pi.rate7<70)));
+  X.reformWhy=age>=72?'les poules ont environ '+age+' semaines (la ponte baisse nettement après 72 semaines)':'la ponte moyenne des 7 derniers jours est de '+pct(pi.rate7)+' (en dessous de 70 %)';
+  return X;
+}
+function curveSvg(b,s){
+  var W=320,H=130,pl=26,pb=18,pt=8,pr=6,days=[],i,d,map={};
+  s.oe.forEach(function(x){map[x.date]=x;});
+  var t0=Date.parse(todayISO());
+  for(i=29;i>=0;i--){d=new Date(t0-i*864e5).toISOString().slice(0,10);days.push(d);}
+  var hens=Math.max(1,s.alive),pts=[],avg=[],tg=[],age0=b.age0;
+  days.forEach(function(dd,k){var x=map[dd];pts.push(x?x.n/hens*100:null);
+    var w=[],j;for(j=Math.max(0,k-6);j<=k;j++){if(pts[j]!=null){w.push(pts[j]);}}avg.push(w.length?w.reduce(function(a,c){return a+c;},0)/w.length:null);
+    if(age0){var a=age0+Math.floor((Date.parse(dd)-Date.parse(b.date))/6048e5),L=legAt(a);tg.push(L?L.hdA:null);}else{tg.push(null);}});
+  var all=pts.concat(tg).filter(function(v){return v!=null;});if(!all.length){return '';}
+  var mx=Math.min(100,Math.max(60,Math.ceil(Math.max.apply(null,all)/10)*10)),mn=Math.max(0,Math.floor(Math.min(Math.min.apply(null,all),60)/10)*10);
+  var X=function(k){return pl+k*(W-pl-pr)/29;},Y=function(v){return pt+(mx-v)*(H-pt-pb)/(mx-mn);};
+  var line=function(arr,col,w,dash){var p='',on=false;arr.forEach(function(v,k){if(v==null){on=false;return;}p+=(on?'L':'M')+X(k).toFixed(1)+' '+Y(v).toFixed(1);on=true;});return p?'<path d="'+p+'" fill="none" stroke="'+col+'" stroke-width="'+w+'"'+(dash?' stroke-dasharray="'+dash+'"':'')+' stroke-linecap="round" stroke-linejoin="round"/>':'';};
+  var g='',v;for(v=mn;v<=mx;v+=10){g+='<line x1="'+pl+'" x2="'+(W-pr)+'" y1="'+Y(v).toFixed(1)+'" y2="'+Y(v).toFixed(1)+'" stroke="#8884" stroke-width="1"/><text x="'+(pl-4)+'" y="'+(Y(v)+3).toFixed(1)+'" font-size="9" text-anchor="end" fill="currentColor" opacity=".6">'+v+'</text>';}
+  var dots=pts.map(function(v,k){return v==null?'':'<circle cx="'+X(k).toFixed(1)+'" cy="'+Y(v).toFixed(1)+'" r="2" fill="#2E9E5B" opacity=".55"/>';}).join('');
+  var lab='<text x="'+pl+'" y="'+(H-4)+'" font-size="9" fill="currentColor" opacity=".6">il y a 30 j</text><text x="'+(W-pr)+'" y="'+(H-4)+'" font-size="9" text-anchor="end" fill="currentColor" opacity=".6">aujourd\'hui</text>';
+  return '<svg viewBox="0 0 '+W+' '+H+'" width="100%" role="img" aria-label="Courbe de ponte sur 30 jours" style="display:block;color:inherit">'+g+line(tg,'#E0A100',2,'5 4')+dots+line(avg,'#1B7A43',2.5)+lab+'</svg>'+
+   '<div class="sm" style="margin-top:4px"><span style="color:#1B7A43;font-weight:700">━</span> moyenne 7 jours (% de poules qui ont pondu) · <span style="color:#2E9E5B">●</span> chaque jour'+(age0?' · <span style="color:#E0A100;font-weight:700">╌</span> objectif Leghorn':'')+'</div>';
+}
+function ponteGuide(b,s,pi){
+  var X=ponteExtra(b,s,pi),h='';
+  if(!b.age0){
+    return '<div class="card"><div class="h2">🎯 Objectif de ponte</div><div class="sm" style="margin-bottom:8px">Indiquez l\'âge actuel de vos pondeuses (en semaines) pour comparer votre ponte à l\'objectif d\'une Leghorn blanche et connaître la ration conseillée.</div><div class="row"><div><input class="in" id="f_agenow" type="text" inputmode="numeric" placeholder="ex. : 24"></div><div><button class="btn alt sm" type="button" id="agesave">Enregistrer l\'âge</button></div></div></div>';
+  }
+  var t=X.t;
+  if(!t){
+    return '<div class="card"><div class="h2">🎯 Objectif de ponte</div><div class="sm">Pondeuses de '+X.age+' semaines : pas encore en ponte. L\'objectif apparaît à partir de 18 semaines. Ration conseillée avant la ponte : voir tableau de croissance (environ '+LEG.gF[Math.max(0,Math.min(16,X.age-1))]+' g par poule et par jour).</div><button class="chip sm" type="button" id="ageedit" style="margin-top:8px">Corriger l\'âge</button></div>';
+  }
+  var gap=pi.list.length?pi.rate7-t.hdA:null,col=gap==null?'':(gap>=-3?'var(--green)':(gap>=-8?'var(--amber)':'var(--red)'));
+  h='<div class="card"><div class="h2">🎯 Objectif de ponte · '+X.age+' semaines</div><div class="row"><div><div class="sm">Votre taux (7 j)</div><b style="font-size:20px">'+(pi.list.length?pct(pi.rate7):'—')+'</b></div><div><div class="sm">Objectif Leghorn</div><b style="font-size:20px">'+t.hdA+' %</b></div><div><div class="sm">Maximum possible</div><b style="font-size:20px">'+t.hdO+' %</b></div></div>'+
+   (gap!=null?'<div class="sm" style="margin-top:8px;color:'+col+';font-weight:700">'+(gap>=-3?'Bonne ponte : vous êtes dans l\'objectif.':(gap>=-8?'Ponte un peu en dessous de l\'objectif ('+pct(Math.abs(gap))+' de moins).':'Ponte nettement en dessous de l\'objectif ('+pct(Math.abs(gap))+' de moins). Vérifiez eau, aliment, lumière, maladies.'))+'</div>':'')+
+   '<div style="border-top:1px solid var(--pB);margin:10px 0"></div><div class="h2" style="font-size:15px">🌾 Ration conseillée</div><div class="sm"><b>'+t.feed+' g</b> d\'aliment par poule et par jour, soit <b>'+fmt1(t.feed*s.alive/1000)+' kg</b> par jour pour vos '+s.alive+' pondeuses.'+(X.fgh>0?'<br>Distribué ces 7 derniers jours : <b>'+Math.round(X.fgh)+' g</b> par poule et par jour'+(X.fgh<t.feed*0.9?' (<span class="mort">insuffisant</span> : la ponte peut baisser)':(X.fgh>t.feed*1.1?' (un peu trop : gaspillage possible)':' (correct)')):'')+'<br>Poids d\'un œuf attendu : environ '+t.egg+' g.</div>'+
+   '<div class="sm" style="margin-top:8px;opacity:.75">Repères de la lignée Hy-Line W-36 (Leghorn blanche), guide 2011, à titre indicatif. Vos résultats dépendent du climat, de l\'aliment et de la santé du lot.</div><button class="chip sm" type="button" id="ageedit" style="margin-top:8px">Corriger l\'âge</button></div>';
+  return h;
+}
+function ponteMoney(b,s,pi){
+  var X=ponteExtra(b,s,pi);
+  return '<div class="card"><div class="h2">💰 Coût et marge du plateau</div><div class="row"><div><div class="sm">Coût de revient</div><b>'+(pi.costPl>0?fmt(pi.costPl)+' F':'—')+'</b></div><div><div class="sm">Prix de vente moyen</div><b>'+(X.pr>0?fmt(Math.round(X.pr))+' F':'—')+'</b></div><div><div class="sm">Marge / plateau</div><b style="color:'+(X.margin==null?'inherit':(X.margin>=0?'var(--green)':'var(--red)'))+'">'+(X.margin==null?'—':(X.margin>=0?'+':'−')+fmt(Math.abs(Math.round(X.margin)))+' F')+'</b></div></div>'+
+   '<div class="sm" style="margin-top:8px">'+(X.margin==null?'Le coût apparaît après 30 œufs produits ; le prix moyen après la première vente d\'œufs.':(X.margin>=0?'Vous gagnez environ '+fmt(Math.round(X.margin))+' F sur chaque plateau vendu.':'Vous perdez environ '+fmt(Math.round(-X.margin))+' F sur chaque plateau. Vendez plus cher ou baissez les dépenses.'))+'</div></div>';
+}
+function ponteHV(b,s){
+  var L=(s.hvL||[]).slice().sort(function(a,c){return c.date.localeCompare(a.date)||(c.ts||0)-(a.ts||0);}).slice(0,8);
+  return '<div class="card"><div class="h2">🥚 Œufs non vendus</div><div class="sm" style="margin-bottom:8px">Œufs donnés, mangés ou perdus : ils sortent du stock sans être vendus.'+(s.hv>0?' Total : <b>'+fmt(s.hv)+'</b> œufs.':'')+'</div>'+
+   '<div class="row fld"><div><label class="l" for="h_n">Nombre d\'œufs</label><input class="in" id="h_n" type="text" inputmode="numeric" placeholder="ex. : 12"></div><div><label class="l" for="h_m">Motif</label><select class="in sel" id="h_m"><option>Consommés</option><option>Donnés</option><option>Perdus</option></select></div></div>'+
+   '<button class="btn alt" type="button" id="hvsave">Retirer du stock</button>'+
+   (L.length?L.map(function(x){return '<div class="line" data-hv="'+esc(x.id)+'"><span>'+fd(x.date)+' · <b>'+fmt(x.n)+'</b> œufs · '+esc(x.motif||'')+'</span><button class="chip sm" type="button" data-hvdel="'+esc(x.id)+'">Annuler</button></div>';}).join(''):'')+'</div>';
+}
+function ponteReformBox(b,s,pi){
+  var X=ponteExtra(b,s,pi);if(!X.reform){return '';}
+  return '<div class="box redbox" style="margin-bottom:12px"><b>🐔 Pensez à la réforme</b><div class="sm" style="color:var(--redDk)">Pourquoi : '+X.reformWhy+'. Comparez le coût de l\'aliment avec ce que rapportent les œufs ; vendre les poules de réforme (« + Réforme ») et renouveler le lot peut être plus rentable.</div></div>';
+}
 function ponteInfo(b,s){
   var oe=s.oe.slice().sort(function(a,c){return c.date.localeCompare(a.date)||(c.ts||0)-(a.ts||0);});
   var hens=Math.max(1,s.alive),last=oe[0]||null,l7=oe.slice(0,7),prev=oe.slice(1,8);
@@ -276,19 +339,19 @@ function ponteInfo(b,s){
 }
 function ponteCard(b,s){
   var pi=ponteInfo(b,s);
-  return '<a class="card" href="#/oeufs" style="display:block;text-decoration:none;color:inherit"><div class="h2">🥚 Ponte</div><div class="row"><div><div class="sm">Aujourd\'hui</div><b>'+(pi.today?fmt(pi.today.n)+' œufs':'À saisir')+'</b></div><div><div class="sm">Taux de ponte</div><b>'+pct(pi.today?pi.today.n/Math.max(1,s.alive)*100:pi.rate7)+'</b></div><div><div class="sm">Stock d\'œufs</div><b>'+Math.floor(s.oStock/30)+' pl.</b></div></div></a>';
+  return '<a class="card" href="#/oeufs" style="display:block;text-decoration:none;color:inherit"><div class="h2">🥚 Ponte</div><div class="row"><div><div class="sm">Aujourd\'hui</div><b>'+(pi.today?fmt(pi.today.n)+' œufs':'À saisir')+'</b></div><div><div class="sm">Taux de ponte</div><b>'+pct(pi.today?pi.today.n/Math.max(1,s.alive)*100:pi.rate7)+'</b></div><div><div class="sm">Stock d\'œufs</div><b>'+Math.floor(s.oStock/30)+' pl.</b></div></div>'+(function(){var t=legAt(pAge(b));return t?'<div class="sm" style="margin-top:6px">Objectif à '+pAge(b)+' semaines : <b>'+t.hdA+' %</b></div>':'';})()+'</a>';
 }
 function ponteBilan(b,d,ln){
   var s=d.s,pi=ponteInfo(b,s),sep='<div style="border-top:1px solid var(--pB);margin:8px 0"></div>';
   return '<div class="card"><div class="h2">Pondeuses et ponte</div>'+ln('Pondeuses mises en place',b.nb)+ln('Mortes','<span class="mort">'+s.dead+' ('+pct(s.rate)+')</span>')+ln('Réformées (vendues)',s.sold)+ln('Restantes',s.alive)+sep+
-  ln('Œufs ramassés',fmt(s.rec))+ln('Œufs cassés',fmt(s.cas)+' ('+pct(pi.casPct)+')')+ln('Œufs vendus',s.pl+' plateaux')+ln('Stock d\'œufs',plat(s.oStock))+ln('Taux de ponte (7 derniers jours)',pct(pi.rate7))+sep+
+  ln('Œufs ramassés',fmt(s.rec))+ln('Œufs cassés',fmt(s.cas)+' ('+pct(pi.casPct)+')')+ln('Œufs vendus',s.pl+' plateaux')+(s.hv>0?ln('Œufs non vendus (dons, repas, pertes)',fmt(s.hv)):'')+ln('Stock d\'œufs',plat(s.oStock))+ln('Taux de ponte (7 derniers jours)',pct(pi.rate7))+sep+
   ln('Ventes d\'œufs',fmt(s.venO)+' FCFA')+ln('Ventes de poules (réformes)',fmt(s.venP)+' FCFA')+
   '<div class="box" style="margin-top:10px"><b>Prix minimum du plateau : '+(pi.costPl>0?fmt(pi.costPl)+' FCFA':'—')+'</b><div class="sm" style="color:var(--pDk)">pour couvrir toutes les dépenses (après vente des poules de réforme).</div></div></div>';
 }
 function ponteTxt(b,d,L){
   var s=d.s,pi=ponteInfo(b,s);
   L.push('Pondeuses : '+b.nb+' mises en place · '+s.dead+' mortes ('+pct(s.rate)+') · '+s.sold+' réformées · '+s.alive+' restantes');
-  L.push('Œufs ramassés : '+fmt(s.rec)+' · cassés : '+fmt(s.cas)+' ('+pct(pi.casPct)+') · vendus : '+s.pl+' plateaux · stock : '+plat(s.oStock));
+  L.push('Œufs ramassés : '+fmt(s.rec)+' · cassés : '+fmt(s.cas)+' ('+pct(pi.casPct)+') · vendus : '+s.pl+' plateaux'+(s.hv>0?' · non vendus : '+fmt(s.hv):'')+' · stock : '+plat(s.oStock));
   L.push('Taux de ponte (7 derniers jours) : '+pct(pi.rate7));
   L.push('Ventes d\'œufs : '+fmt(s.venO)+' FCFA · ventes de poules : '+fmt(s.venP)+' FCFA');
   if(pi.costPl>0){L.push('Prix minimum du plateau pour couvrir les dépenses : '+fmt(pi.costPl)+' FCFA');}
@@ -332,6 +395,11 @@ function vHome(){
   if(resv>s.alive){alerts.push('Commandes en attente ('+resv+' poulets) supérieures aux poulets vivants ('+s.alive+')');}
   if(s.rate>5){alerts.push('Mortalité élevée : '+pct(s.rate)+' (au-dessus de 5 %)');}
   if(P){var pi0=ponteInfo(b,s);if(pi0.drop){alerts.push('Baisse de ponte : '+fmt(pi0.last.n)+' œufs au lieu de '+fmt(pi0.prevAvg)+' en moyenne. Vérifiez eau, aliment, chaleur, stress.');}}
+  if(P&&!b.fin){var px=ponteInfo(b,s),XX=ponteExtra(b,s,px);
+    if(XX.reform){alerts.push('Pensez à la réforme : '+XX.reformWhy);}
+    if(XX.t&&px.list.length>=3&&px.rate7<XX.t.hdA-8){alerts.push('Ponte sous l\'objectif : '+pct(px.rate7)+' au lieu de '+XX.t.hdA+' % à '+XX.age+' semaines');}
+    var vd=vaxDue(b).due;if(vd.length){alerts.push('💉 Vaccin à faire : '+vd[0].t);}
+    if(!px.today&&new Date().getHours()>=16){alerts.push('🥚 Pensez à saisir la ponte du jour (touchez « Saisie du jour »)');}}
   var live=b.nb?Math.max(0,Math.round((b.nb-s.dead)/b.nb*100)):0,ls=licOn()?licState():null;
   var sub=(ls&&ls.mode==='paid')?'<a href="#/licence" style="color:inherit;text-decoration:none">Version complète · '+ls.days+' jour'+s1(ls.days)+'</a>':'';
   var lic=(ls&&ls.mode==='paid'&&ls.days>7)?'':licCard();
@@ -349,18 +417,18 @@ function vHome(){
   var chip=function(h,t,c){return '<a class="chip" href="'+h+'"'+(c?' style="color:'+c+'"':'')+'>'+t+'</a>';};
   var chips='<div class="chips scroll hchips">'+(P?chip('#/saisie','Saisie du jour'):'')+chip('#/depense/new','+ Dépense','var(--red)')+
     (P?chip('#/vente/new-oeuf','+ Œufs vendus','var(--green)')+chip('#/vente/new-reforme','+ Réforme','var(--green)'):chip('#/vente/new','+ Vente','var(--green)'))+
-    chip('#/bilan','Bilan')+chip('#/dettes','Dettes')+(P?'':chip('#/clients','Clients'))+(P?'':chip('#/simulateur','Simulateur')+chip('#/climat','Météo'))+chip('#/employes','Gérants')+chip('#/securite',pinOn()?'🔒 Verrouillage':'Verrouillage')+chip('#/reglages','Réglages')+'</div>';
+    chip('#/bilan','Bilan')+chip('#/dettes','Dettes')+(P?'':chip('#/clients','Clients'))+(P?'':chip('#/simulateur','Simulateur')+chip('#/climat','Météo'))+chip('#/carnet','Carnet vaccins')+chip('#/employes','Gérants')+chip('#/securite',pinOn()?'🔒 Verrouillage':'Verrouillage')+chip('#/reglages','Réglages')+'</div>';
   var html='<div class="screen"><div class="hdr"><div style="display:flex;align-items:center;gap:10px;min-width:0"><div class="logo" style="width:40px;height:40px;box-shadow:0 0 0 2px var(--yel);border-radius:12px;flex:none">'+LOGO+'</div><div style="min-width:0"><div style="font-weight:700;font-size:17px;line-height:1.1">Mon Poulailler</div><div class="sm">'+sub+'</div></div></div>'+bsel()+'</div>'+
   (db.pending.length?'<a class="box" href="#/valider" style="display:block;text-decoration:none;margin-bottom:14px;background:var(--amberBg);color:var(--amber)"><b>'+db.pending.length+' saisie'+(db.pending.length>1?'s':'')+' des gérants à valider</b><div class="sm" style="color:var(--amber)">Touchez pour vérifier et valider</div></a>':'')+
-  (db.demo?'<div class="box yelbox" style="margin-bottom:14px"><b>Mode exemple</b><div class="sm" style="color:var(--yelDk);margin:4px 0">Ces chiffres sont fictifs. Explorez librement, puis démarrez avec votre vrai élevage.</div><button class="btn yel sm" type="button" data-demoend="1" style="margin-top:6px">Commencer mon vrai élevage</button></div>':'')+updBox()+lic+
-  (((!cfg.lastBackup||(Date.now()-new Date(cfg.lastBackup).getTime())>14*864e5)&&db.ventes.length+db.depenses.length>3)?'<a class="box" href="#/reglages" style="display:block;text-decoration:none;margin-bottom:14px;background:var(--amberBg);color:var(--amber)"><b>☁️ Pensez à sauvegarder sur Google Drive</b><div class="sm" style="color:var(--amber)">'+(cfg.lastBackup?'Dernière sauvegarde il y a plus de 14 jours.':'Vous n\'avez encore jamais fait de sauvegarde.')+' Touchez ici.</div></a>':'')+
+  (db.demo?'<div class="box yelbox" style="margin-bottom:14px"><b>Mode exemple</b><div class="sm" style="color:var(--yelDk);margin:4px 0">Ces chiffres sont fictifs. Explorez librement, puis démarrez avec votre vrai élevage.</div><button class="btn yel sm" type="button" data-demoend="1" style="margin-top:6px">Commencer mon vrai élevage</button></div>':'')+iosHint(true)+updBox()+lic+
+  (((!cfg.lastBackup||(Date.now()-new Date(cfg.lastBackup).getTime())>(window.AndroidBridge?14:7)*864e5)&&db.ventes.length+db.depenses.length>3)?'<a class="box" href="#/reglages" style="display:block;text-decoration:none;margin-bottom:14px;background:var(--amberBg);color:var(--amber)"><b>☁️ Pensez à sauvegarder sur Google Drive</b><div class="sm" style="color:var(--amber)">'+(cfg.lastBackup?'Dernière sauvegarde il y a plus de '+(window.AndroidBridge?14:7)+' jours.':'Vous n\'avez encore jamais fait de sauvegarde.')+' Touchez ici.</div></a>':'')+
   '<div class="hero2"><div class="hrow"><div><div class="hl">'+(P?'Pondeuses vivantes':'Poulets vivants')+'</div><div class="hn">'+s.alive+'</div><div class="hs">sur '+b.nb+' · jour '+dayN(b)+(b.fin?' · terminée':'')+'</div></div><div class="ring"><b>'+live+' %</b><span>survie</span></div></div>'+
   '<div class="hk"><div><i>Dépenses</i><b>'+fmt(s.depT)+'</b></div><div><i>Ventes</i><b>'+fmt(s.venT)+'</b></div><div><i>'+(loss?'Perte':'Bénéfice')+'</i><b style="color:'+(loss?'#FFB3A8':'#fff')+'">'+fmt(Math.abs(s.profit))+'</b></div></div>'+
   '<div class="hm">Mortalité : <b>'+s.dead+'</b> mort'+(s.dead>1?'s':'')+' · <b>'+pct(s.rate)+'</b></div></div>'+
   (P?ponteCard(b,s):'')+
   ((!P&&s.fr.stock>0)?'<div class="box" style="margin-bottom:12px">❄️ <b>'+s.fr.stock+' sujet'+(s.fr.stock>1?'s':'')+' au frigo</b> à vendre<div class="sm" style="color:var(--pDk)">Pour vendre : Nouvelle vente, puis cochez « Sujet égorgé gardé au frigo ».</div></div>':'')+
   (P?'<a class="btn2" href="#/oeufs">Ramassage des œufs</a>':'<a class="btn2" href="#/saisie">Saisie du jour</a>')+chips+mk+
-  '<div class="two"><div class="al'+(alerts.length?'':' ok')+'" data-tg="alall"><b>'+(alerts.length?alerts.length+' alerte'+(alerts.length>1?'s':''):'Aucune alerte')+'</b><span>'+(alerts.length?alerts[0]:'Tout va bien')+'</span></div>'+tile+'</div>'+planCard(b,P)+
+  '<div class="two"><div class="al'+(alerts.length?'':' ok')+'" data-tg="alall"><b>'+(alerts.length?alerts.length+' alerte'+(alerts.length>1?'s':''):'Aucune alerte')+'</b><span>'+(alerts.length?alerts[0]:'Tout va bien')+'</span></div>'+tile+'</div>'+planCard(b,P)+vaxPCard(b,P)+
   '<div id="alall" hidden class="card"><div class="h2">Alertes</div>'+alerts.map(function(a){return '<div class="line"><span>⚠ '+a+'</span></div>';}).join('')+'</div></div>';
   return {html:html,theme:'t-green',init:function(){bindBsel();bindPrix();bindStat();
     app.querySelectorAll('[data-tg]').forEach(function(el){el.onclick=function(){var t=document.getElementById(el.dataset.tg);if(t){t.hidden=!t.hidden;}};});
@@ -593,7 +661,7 @@ function vOeufs(){
   if(!isP(b)){return {html:'<div class="screen"><div class="top"><h1>Ramassage des œufs</h1>'+bsel()+'</div><div class="box redbox"><b>Cette vague est une vague de poulets de chair.</b><div class="sm" style="color:var(--redDk)">Choisissez une vague de pondeuses ci-dessus, ou créez-en une dans « Vagues ».</div></div><a class="btn alt" href="#/bande/new">+ Nouvelle vague de pondeuses</a></div>',theme:'t-green',init:bindBsel};}
   var pi=ponteInfo(b,s),list=pi.list.slice(0,30);
   var html='<div class="screen"><div class="top"><h1>Les œufs</h1>'+bsel()+'</div>'+
-  (pi.drop?'<div class="box redbox" style="margin-bottom:12px"><b>⚠ Baisse de ponte</b><div class="sm" style="color:var(--redDk)">'+fmt(pi.last.n)+' œufs au lieu de '+fmt(pi.prevAvg)+' en moyenne. Vérifiez l\'eau, l\'aliment, la chaleur et les maladies.</div></div>':'')+
+  ponteReformBox(b,s,pi)+(pi.drop?'<div class="box redbox" style="margin-bottom:12px"><b>⚠ Baisse de ponte</b><div class="sm" style="color:var(--redDk)">'+fmt(pi.last.n)+' œufs au lieu de '+fmt(pi.prevAvg)+' en moyenne. Vérifiez l\'eau, l\'aliment, la chaleur et les maladies.</div></div>':'')+
   '<div class="card"><div class="row"><div><div class="sm">Taux de ponte (dernier jour)</div><div class="big" style="font-size:22px">'+pct(pi.rateLast)+'</div></div><div><div class="sm">Moyenne 7 jours</div><div class="big" style="font-size:22px">'+pct(pi.rate7)+'</div></div></div>'+
   '<div class="row" style="margin-top:10px"><div><div class="sm">Stock d\'œufs</div><b>'+plat(s.oStock)+'</b></div><div><div class="sm">Pondeuses vivantes</div><b>'+s.alive+'</b></div></div>'+
   '<div class="sm" style="margin-top:10px">Ramassés : '+fmt(s.rec)+' · cassés : '+fmt(s.cas)+' ('+pct(pi.casPct)+') · vendus : '+s.pl+' plateaux'+(pi.costPl>0?' · coût du plateau : '+fmt(pi.costPl)+' FCFA':'')+'</div></div>'+
@@ -601,10 +669,15 @@ function vOeufs(){
   '<div class="row fld"><div><label class="l" for="f_n">Œufs ramassés</label><input class="in" id="f_n" type="text" inputmode="numeric" placeholder="ex. : 420"></div><div><label class="l" for="f_c">Œufs cassés</label><input class="in" id="f_c" type="text" inputmode="numeric" placeholder="0"></div></div>'+
   '<div class="sm fld">Taux de ponte : <b id="f_tx">—</b></div>'+
   '<button class="btn" type="button" id="save">Enregistrer</button><button class="btn danger" type="button" id="del" style="display:none">Supprimer ce jour</button></div>'+
+  '<div class="card"><div class="h2">📈 Ponte des 30 derniers jours</div>'+(s.oe.length?curveSvg(b,s):'<div class="sm">La courbe apparaît dès le premier ramassage saisi.</div>')+'</div>'+ponteGuide(b,s,pi)+ponteMoney(b,s,pi)+ponteHV(b,s)+
   '<div class="card"><div class="h2">Derniers jours</div>'+(list.length?list.map(function(x){return '<div class="line" data-oe="'+esc(x.id)+'" style="cursor:pointer"><span>'+fd(x.date)+' · <b>'+fmt(x.n)+'</b> œufs'+(x.casses>0?' · '+fmt(x.casses)+' cassés':'')+'</span><span class="sm">'+pct(x.n/Math.max(1,s.alive)*100)+'</span></div>';}).join('')+'<div class="sm" style="margin-top:8px">Touchez un jour pour le modifier.</div>':'<div class="sm">Aucun ramassage enregistré.</div>')+'</div>'+
   '<a class="btn alt" href="#/vente/new-oeuf">Vendre des œufs</a></div>';
   return {html:html,theme:'t-green',init:function(){
     bindBsel();
+    var asv=$('#agesave');if(asv){asv.onclick=function(){var a=Math.floor(num($('#f_agenow').value));if(!(a>=1&&a<=120)){toast('Saisissez un âge entre 1 et 120 semaines');return;}b.age0=Math.max(1,a-Math.floor((Date.parse(todayISO())-Date.parse(b.date))/6048e5));save();toast('Âge enregistré');route();};}
+    var aed=$('#ageedit');if(aed){aed.onclick=function(){var v=prompt('Âge actuel des pondeuses en semaines ?',pAge(b)||'');if(v===null){return;}var a=Math.floor(num(v));if(!(a>=1&&a<=120)){toast('Âge invalide');return;}b.age0=Math.max(1,a-Math.floor((Date.parse(todayISO())-Date.parse(b.date))/6048e5));save();toast('Âge corrigé');route();};}
+    var hs=$('#hvsave');if(hs){hs.onclick=function(){var n=Math.floor(num($('#h_n').value));if(!(n>0)){toast('Saisissez le nombre d\'œufs');return;}if(n>s.oStock){toast('Il n\'y a que '+fmt(s.oStock)+' œufs en stock');return;}db.oeufsHV=db.oeufsHV||[];db.oeufsHV.push({id:uid(),ts:Date.now(),b:b.id,date:todayISO(),n:n,motif:$('#h_m').value});save();toast('Retiré du stock');route();};}
+    app.querySelectorAll('[data-hvdel]').forEach(function(el){el.onclick=function(){if(confirm('Annuler ce retrait du stock ?')){db.oeufsHV=(db.oeufsHV||[]).filter(function(y){return y.id!==el.dataset.hvdel;});save();toast('Annulé');route();}};});
     var cur=null,tx=function(){var n=Math.floor(num($('#f_n').value));$('#f_tx').textContent=n>0?pct(n/Math.max(1,s.alive)*100):'—';};
     $('#f_n').oninput=tx;
     app.querySelectorAll('[data-oe]').forEach(function(el){el.onclick=function(){
@@ -644,7 +717,7 @@ function vBandeForm(){
   '<button class="btn" type="button" id="save">'+(first?'Commencer':'Créer la vague')+'</button></form>'+
   (first?'<button class="btn alt" type="button" data-demo="1" style="margin-top:12px">👀 Voir un exemple (sans rien saisir)</button><div class="sm" style="text-align:center;margin:8px 0 14px">Un élevage fictif pour découvrir l\'application en 1 minute.</div>':'')+
   (first?'<div class="card" style="margin-top:6px"><div class="sm" style="margin-bottom:8px">Vous avez déjà une sauvegarde ?</div><button class="btn alt sm" type="button" data-import="1">Importer une sauvegarde</button><input type="file" id="impfile" accept=".json,application/json" hidden></div>':'')+
-  (first?'<div style="text-align:center;margin-top:16px"><button class="chip sm" type="button" data-role="worker">J\'ai un code de gérant</button></div>'+iosHint()+'<div class="sm" style="text-align:center;margin-top:10px">Un identifiant anonyme du téléphone et la version de l\'application sont envoyés une fois par jour pour compter les utilisateurs. Aucune donnée d\'élevage n\'est envoyée.</div>':'')+'</div>';
+  (first?'<button class="btn alt" type="button" data-role="worker" style="height:60px;font-size:17px;margin-top:16px">👷 Je suis gérant (j\'ai un code)</button>'+iosHint()+'<div class="sm" style="text-align:center;margin-top:10px">Un identifiant anonyme du téléphone et la version de l\'application sont envoyés une fois par jour pour compter les utilisateurs. Aucune donnée d\'élevage n\'est envoyée.</div>':'')+'</div>';
   return {html:html,theme:'t-green',init:function(){
     var tp=function(){return chipVal('typ')==='Pondeuses';};
     hooks.chip=function(g){if(g!=='typ'){return;}var p=tp();
@@ -1022,9 +1095,9 @@ async function workerFlush(silent){
   if(!silent&&(fail||n)){toast(fail?fail:(n+' envoi'+(n>1?'s':'')+' réussi'+(n>1?'s':'')));}
   return n;
 }
-function iosHint(){
+function iosHint(strong){
   try{var ios=/iPhone|iPad|iPod/.test(navigator.userAgent)&&!window.AndroidBridge;if(!ios||navigator.standalone){return '';}
-  return '<div class="box yelbox" style="margin:14px 0"><b>Installer sur votre iPhone</b><div class="sm" style="color:var(--yelDk);margin-top:4px">Dans Safari, touchez le bouton Partager (carré avec une flèche), puis « Sur l\'écran d\'accueil ». Ouvrez ensuite Mon Poulailler depuis cette icône.</div></div>';}catch(e){return '';}
+  return '<div class="box yelbox" style="margin:14px 0"><b>'+(strong?'⚠ Installez l\'application AVANT de saisir vos données':'Installer sur votre iPhone')+'</b>'+(strong?'<div class="sm" style="color:var(--yelDk);margin-top:4px">Sur iPhone, ce que vous saisissez dans Safari n\'est pas partagé avec l\'icône installée : vous repartiriez de zéro. Installez d\'abord, puis saisissez.</div>':'')+'<div class="sm" style="color:var(--yelDk);margin-top:4px">Dans Safari, touchez le bouton Partager (carré avec une flèche), puis « Sur l\'écran d\'accueil ». Ouvrez ensuite Mon Poulailler depuis cette icône.</div></div>';}catch(e){return '';}
 }
 function vRole(){
   return {html:'<div class="screen"><div class="welcome"><div class="logo" data-vtap="1">'+LOGO+'</div><h1>Bienvenue dans Mon Poulailler</h1><p>Qui utilise ce téléphone ?</p></div>'+
@@ -1404,6 +1477,45 @@ function cobbFcr(d){d=Math.max(7,cobbDay(d));return COBBF[d-7]/COBBW[d];}
 function cobbPhase(d){return d<=12?'Démarrage':d<=28?'Croissance 1':d<=39?'Croissance 2':'Finition';}
 var VAXDEF=[{j:1,t:'B1/H120 Vaccin Newcastle'},{j:10,t:'Vaccin Gumboro'},{j:18,t:'Rappel Gumboro'},{j:22,t:'Rappel Newcastle (La Sota)'}];
 function vaxList(){var l=(cfg.vax&&cfg.vax.length)?cfg.vax:VAXDEF;return l.slice().sort(function(a,b){return a.j-b.j;});}
+
+var VAXP=[{j:1,t:'Marek (souvent déjà fait au couvoir)'},{j:5,t:'Newcastle B1 + Bronchite H120 (gouttes dans l\'œil)'},{j:10,t:'Gumboro'},{j:18,t:'Rappel Gumboro'},{j:22,t:'Rappel Newcastle La Sota'},{j:49,t:'Variole aviaire (sous l\'aile)'},{j:77,t:'Rappel Newcastle'},{j:119,t:'Newcastle + Bronchite avant la ponte'},{j:189,t:'Rappel Newcastle (en ponte)'},{j:259,t:'Rappel Newcastle (en ponte)'},{j:329,t:'Rappel Newcastle (en ponte)'},{j:399,t:'Rappel Newcastle (en ponte)'},{j:469,t:'Rappel Newcastle (en ponte)'},{j:539,t:'Rappel Newcastle (en ponte)'}];
+function vaxListP(){var l=(cfg.vaxP&&cfg.vaxP.length)?cfg.vaxP:VAXP;return l.slice().sort(function(a,b){return a.j-b.j;});}
+function pAgeD(b){if(!b||!b.age0){return 0;}return b.age0*7+Math.max(0,Math.floor((Date.parse(todayISO())-Date.parse(b.date))/864e5));}
+function vaxDue(b){
+  if(!isP(b)||b.fin||!b.age0){return {due:[],next:null};}
+  var d=pAgeD(b),done=b.vdone||[],l=vaxListP();
+  return {due:l.filter(function(x){return x.j<=d+2&&x.j>=d-10&&done.indexOf(x.j+'|'+x.t)<0;}),next:l.filter(function(x){return x.j>d+2;})[0]||null,d:d};
+}
+function vaxPCard(b,P){
+  if(!P||!b||b.fin){return '';}
+  if(!b.age0){return '<a class="card" href="#/oeufs" style="display:block;text-decoration:none;color:inherit"><div class="h2" style="color:var(--green)">💉 Calendrier de vaccins</div><div class="sm">Indiquez l\'âge de vos pondeuses (écran « Les œufs ») pour recevoir les rappels de vaccins au bon moment.</div></a>';}
+  var v=vaxDue(b),wk=Math.floor(v.d/7);
+  return '<div class="card"><div class="h2" style="color:var(--green)">💉 Vaccins · '+wk+' semaines</div>'+
+   (v.due.length?v.due.map(function(x){return '<div class="box" style="margin-top:8px"><b>À faire :</b> '+esc(x.t)+(x.j<v.d-2?' <span class="sm">(prévu il y a '+(v.d-x.j)+' jours)</span>':'')+'<div style="margin-top:8px"><button class="btn sm" type="button" data-vfait="'+x.j+'|'+esc(x.t)+'">✓ C\'est fait</button></div></div>';}).join(''):'<div class="sm">Aucun vaccin à faire pour le moment.</div>')+
+   (v.next?'<div class="sm" style="margin-top:8px">Prochain : <b>'+esc(v.next.t)+'</b> dans '+Math.max(1,v.next.j-v.d)+' jour'+(v.next.j-v.d>1?'s':'')+'</div>':'')+
+   '<div class="sm" style="margin-top:6px">Calendrier standard, à confirmer avec votre vétérinaire. <a href="#/rappels/p">Modifier</a> · <a href="#/carnet">Carnet de vaccins</a></div></div>';
+}
+function vCarnet(){
+  var b=curBande(),L=(db.vacc||[]).slice().sort(function(a,c){return c.date.localeCompare(a.date)||(c.ts||0)-(a.ts||0);}),dr=ui.vdraft||'',td=todayISO();
+  var names=(isP(b)?VAXP:VAXDEF).map(function(x){return x.t;}).filter(function(v,i,a){return a.indexOf(v)===i;});
+  var html='<div class="screen"><div class="ttl"><a class="back" href="#/accueil" aria-label="Retour">‹</a><h1>Carnet de vaccins</h1></div>'+bsel()+
+  '<div class="card"><div class="h2">Noter un vaccin</div>'+
+  '<div class="fld"><label class="l" for="v_n">Vaccin</label><input class="in" id="v_n" type="text" list="v_dl" value="'+esc(dr)+'" placeholder="ex. : Gumboro"><datalist id="v_dl">'+names.map(function(n){return '<option value="'+esc(n)+'">';}).join('')+'</datalist></div>'+
+  '<div class="fld"><label class="l" for="v_d">Date</label><input class="in" id="v_d" type="date" value="'+td+'"></div>'+
+  '<div class="fld"><label class="l" for="v_p">Produit / marque (facultatif)</label><input class="in" id="v_p" type="text" placeholder="ex. : Avishield ND B1+IB H120"></div>'+
+  '<div class="row fld"><div><label class="l" for="v_l">N° de lot</label><input class="in" id="v_l" type="text" placeholder="ex. : 5100066"></div><div><label class="l" for="v_e">Péremption</label><input class="in" id="v_e" type="date"></div></div>'+
+  '<div class="fld"><label class="l" for="v_q">Nombre de doses utilisées (facultatif)</label><input class="in" id="v_q" type="text" inputmode="numeric" placeholder="ex. : 500"></div>'+
+  '<button class="btn" type="button" id="v_save">Enregistrer</button></div>'+
+  '<div class="card"><div class="h2">Vaccins faits ('+L.length+')</div>'+(L.length?L.map(function(x){var bb=db.bandes.filter(function(y){return y.id===x.b;})[0],exp=x.exp&&x.exp<td;
+    return '<div class="line" style="align-items:flex-start"><span><b>'+esc(x.nom)+'</b><br><span class="sm">'+fd(x.date)+'/'+x.date.slice(0,4)+(bb?' · '+esc(bb.nom):'')+(x.prod?' · '+esc(x.prod):'')+(x.lot?' · lot '+esc(x.lot):'')+(x.exp?' · périme '+fd(x.exp)+'/'+x.exp.slice(0,4):'')+(x.doses?' · '+fmt(x.doses)+' doses':'')+'</span>'+(exp?'<br><span class="mort sm">⚠ Vaccin périmé au moment de l\'utilisation ? Vérifiez.</span>':'')+'</span><button class="chip sm" type="button" data-vdel="'+esc(x.id)+'">Supprimer</button></div>';}).join(''):'<div class="sm">Aucun vaccin noté. Le carnet garde le lot et la péremption : utile si un problème survient.</div>')+'</div></div>';
+  return {html:html,theme:'t-green',init:function(){
+    bindBsel();ui.vdraft='';
+    $('#v_save').onclick=function(){var n=$('#v_n').value.trim();if(!n){toast('Indiquez le nom du vaccin');return;}var ex=$('#v_e').value,dt=$('#v_d').value||td;
+      if(ex&&ex<dt&&!confirm('La date de péremption est dépassée. Enregistrer quand même ?')){return;}
+      db.vacc=db.vacc||[];db.vacc.push({id:uid(),ts:Date.now(),b:b.id,date:dt,nom:n,prod:$('#v_p').value.trim(),lot:$('#v_l').value.trim(),exp:ex,doses:Math.floor(num($('#v_q').value))||0});save();toast('Vaccin noté');route();};
+    app.querySelectorAll('[data-vdel]').forEach(function(el){el.onclick=function(){if(confirm('Supprimer cette ligne ?')){db.vacc=(db.vacc||[]).filter(function(y){return y.id!==el.dataset.vdel;});save();route();}};});
+  }};
+}
 function planCard(b,P){
   if(P||!b||b.fin){return '';}
   var d=dayN(b),w=cobbW(d),ph=cobbPhase(d),l=vaxList(),now=l.filter(function(x){return x.j===d;}),nx=l.filter(function(x){return x.j>d;})[0],late=l.filter(function(x){return x.j<d&&x.j>=d-1;});
@@ -1416,19 +1528,19 @@ function planCard(b,P){
   '<div class="sm" style="margin-top:6px">Objectifs Cobb500 (2022). Calendrier à confirmer avec votre vétérinaire. <a href="#/rappels">Modifier les rappels</a></div></div>';
   return h;
 }
-function vRappels(){
-  useInc('rap');var l=vaxList();
-  function row(x,i){return '<div class="card" style="padding:10px"><div class="row"><div class="fld" style="flex:0 0 80px"><label class="l" for="r_j'+i+'">Jour</label><input class="in" id="r_j'+i+'" type="text" inputmode="numeric" value="'+x.j+'"></div><div class="fld" style="flex:1"><label class="l" for="r_t'+i+'">Rappel</label><input class="in" id="r_t'+i+'" type="text" value="'+esc(x.t)+'"></div></div><button class="btn danger sm" type="button" data-rdel="'+i+'">Supprimer</button></div>';}
-  var html='<div class="screen"><div class="ttl"><a class="back" href="#/accueil" aria-label="Retour">‹</a><h1>Rappels de la vague</h1></div>'+
-  '<div class="sm" style="margin-bottom:10px">Ces rappels s\'affichent sur l\'accueil au bon jour. Modèle de départ : à confirmer avec votre vétérinaire.</div>'+
+function vRappels(pp){
+  useInc('rap');var PP=(pp==='p'),l=PP?vaxListP():vaxList(),K=PP?'vaxP':'vax';
+  function row(x,i){return '<div class="card" style="padding:10px"><div class="row"><div class="fld" style="flex:0 0 80px"><label class="l" for="r_j'+i+'">'+(PP?'Âge (jours)':'Jour')+'</label><input class="in" id="r_j'+i+'" type="text" inputmode="numeric" value="'+x.j+'"></div><div class="fld" style="flex:1"><label class="l" for="r_t'+i+'">Rappel</label><input class="in" id="r_t'+i+'" type="text" value="'+esc(x.t)+'"></div></div><button class="btn danger sm" type="button" data-rdel="'+i+'">Supprimer</button></div>';}
+  var html='<div class="screen"><div class="ttl"><a class="back" href="#/accueil" aria-label="Retour">‹</a><h1>'+(PP?'Vaccins des pondeuses':'Rappels de la vague')+'</h1></div>'+
+  '<div class="sm" style="margin-bottom:10px">'+(PP?'Âge en jours depuis la naissance (7 jours = 1 semaine, 126 jours = 18 semaines). ':'')+'Ces rappels s\'affichent sur l\'accueil au bon jour. Modèle de départ : à confirmer avec votre vétérinaire.</div>'+
   '<div id="r_list">'+l.map(row).join('')+'</div>'+
   '<button class="btn alt" type="button" id="r_add">+ Ajouter un rappel</button><button class="btn" type="button" id="r_save">Enregistrer</button><button class="btn alt" type="button" id="r_reset">Remettre le modèle de départ</button></div>';
   return {html:html,theme:'t-green',init:function(){
     function collect(){var o=[];for(var i=0;i<60;i++){var a=$('#r_j'+i),t=$('#r_t'+i);if(!a||!t){break;}var j=Math.round(num(a.value)),tx=t.value.trim();if(j>0&&tx){o.push({j:j,t:tx});}}return o;}
-    app.onclick=function(e){var d=e.target.closest&&e.target.closest('[data-rdel]');if(d){var o=collect();o.splice(+d.dataset.rdel,1);cfg.vax=o;saveCfg();route();}};
-    $('#r_add').onclick=function(){var o=collect();o.push({j:1,t:'Nouveau rappel'});cfg.vax=o;saveCfg();route();};
-    $('#r_save').onclick=function(){cfg.vax=collect();saveCfg();toast('Rappels enregistrés');location.hash='#/accueil';};
-    $('#r_reset').onclick=function(){delete cfg.vax;saveCfg();route();};
+    app.onclick=function(e){var d=e.target.closest&&e.target.closest('[data-rdel]');if(d){var o=collect();o.splice(+d.dataset.rdel,1);cfg[K]=o;saveCfg();route();}};
+    $('#r_add').onclick=function(){var o=collect();o.push({j:1,t:'Nouveau rappel'});cfg[K]=o;saveCfg();route();};
+    $('#r_save').onclick=function(){cfg[K]=collect();saveCfg();toast('Rappels enregistrés');location.hash='#/accueil';};
+    $('#r_reset').onclick=function(){delete cfg[K];saveCfg();route();};
   }};
 }
 
@@ -2018,11 +2130,13 @@ function route(){
   if(({employes:1,valider:1,activite:1,commandes:1})[r]&&st.mode!=='paid'){render(vLock('adv'),r);return;}
   if(({depense:1,saisie:1,vente:1,bande:1,oeufs:1})[r]&&st.mode==='expired'){render(vLock('ro'),r);return;}
   if(!db.bandes.length&&r!=='bande'){location.replace('#/bande/new');return;}
-  var views={accueil:vHome,depenses:vDep,depense:function(){return vDepForm(arg);},stock:vStock,saisie:vSaisie,ventes:vVentes,vente:function(){return vVenteForm(arg);},bandes:vBandes,bande:vBandeForm,valider:vValider,employes:vEmployes,commandes:vCommandes,clients:vClients,activite:vActivite,bilan:function(){return vBilan(arg);},oeufs:vOeufs,reglages:vReglages,dettes:vDettes,climat:vClimat,simulateur:vSim,rappels:vRappels,abo:vAbo};
+  var views={accueil:vHome,depenses:vDep,depense:function(){return vDepForm(arg);},stock:vStock,saisie:vSaisie,ventes:vVentes,vente:function(){return vVenteForm(arg);},bandes:vBandes,bande:vBandeForm,valider:vValider,employes:vEmployes,commandes:vCommandes,clients:vClients,activite:vActivite,bilan:function(){return vBilan(arg);},oeufs:vOeufs,reglages:vReglages,dettes:vDettes,climat:vClimat,simulateur:vSim,rappels:function(){return vRappels(arg);},carnet:vCarnet,abo:vAbo};
   render((views[r]||vHome)(),r);
 }
 app.addEventListener('click',function(e){
-  var t=e.target,c=t.closest('.chip[data-g]');
+  var t=e.target,vf=t.closest&&t.closest('[data-vfait]');
+  if(vf){var bb=curBande(),key=vf.dataset.vfait;if(bb){bb.vdone=bb.vdone||[];if(bb.vdone.indexOf(key)<0){bb.vdone.push(key);}save();ui.vdraft=key.split('|').slice(1).join('|');toast('Noté. Ajoutez le lot dans le carnet si vous voulez.');location.hash='#/carnet';}return;}
+  var c=t.closest('.chip[data-g]');
   if(c){var g=c.dataset.g;app.querySelectorAll('.chip[data-g="'+g+'"]').forEach(function(x){x.classList.toggle('on',x===c);x.setAttribute('aria-pressed',x===c);});if(hooks.chip){hooks.chip(g,c.dataset.v);}return;}
   var st=t.closest('[data-step]');if(st&&hooks.step){hooks.step(+st.dataset.step);return;}
   var u=t.closest('[data-use]');
@@ -2190,7 +2304,7 @@ function bindStat(){
 /* ---------- Centre : mises à jour + comptage des appareils ---------- */
 var CENTER={proj:'poulebox',key:'AIzaSyDaAkRRkGchPMrBw6oVKb4fhSFb2qptuWM'};
 function cenOn(){return !!(CENTER.proj&&CENTER.key);}
-var WEBVER='3.10.0 web';
+var WEBVER='3.12.0 web';
 function isWeb(){return !(window.AndroidBridge&&window.AndroidBridge.appInfo);}
 function appInfo(){if(isWeb()){return {name:WEBVER,code:999999};}try{var s=window.AndroidBridge&&window.AndroidBridge.appInfo&&window.AndroidBridge.appInfo();if(s){var a=String(s).split('|');return {name:a[0],code:parseInt(a[1],10)||0};}}catch(e){}return null;}
 function devId(){if(isWeb()){return normDev(getDev());}try{return String((window.AndroidBridge&&window.AndroidBridge.deviceId&&window.AndroidBridge.deviceId())||'').replace(/[^A-Z0-9]/g,'');}catch(e){return '';}}
