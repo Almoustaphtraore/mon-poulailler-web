@@ -801,7 +801,8 @@ function cleanReport(x){
   if(o.type==='mort'){o.n=Math.max(0,Math.floor(num(x.n)));o.cause=CAUSES.indexOf(x.cause)>=0?x.cause:'Inconnue';}
   else if(o.type==='oeuf'){o.n=Math.max(0,Math.floor(num(x.n)));o.casses=Math.min(o.n,Math.max(0,Math.floor(num(x.casses))));}
   else{if(x.prod==='oeuf'){o.prod='oeuf';}o.client=String(x.client||'').slice(0,60);o.qty=Math.max(0,Math.floor(num(x.qty)));o.pu=Math.max(0,num(x.pu));o.recu=Math.max(0,num(x.recu));o.pay=PAYS.indexOf(x.pay)>=0?x.pay:'Espèces';
-    if(o.type==='commande'){o.tel=String(x.tel||'').slice(0,30);o.livr=/^\d{4}-\d\d-\d\d$/.test(String(x.livr))?String(x.livr):'';}}
+    if(o.type==='commande'){o.tel=String(x.tel||'').slice(0,30);o.livr=/^\d{4}-\d\d-\d\d$/.test(String(x.livr))?String(x.livr):'';
+      if(o.who==='Client en ligne'&&cfg.role==='owner'&&db.prix&&db.prix.v>0){o.pu=db.prix.v;}}}
   return o;
 }
 async function refreshOwner(force){
@@ -2304,7 +2305,7 @@ function bindStat(){
 /* ---------- Centre : mises à jour + comptage des appareils ---------- */
 var CENTER={proj:'poulebox',key:'AIzaSyDaAkRRkGchPMrBw6oVKb4fhSFb2qptuWM'};
 function cenOn(){return !!(CENTER.proj&&CENTER.key);}
-var WEBVER='3.12.0 web';
+var WEBVER='3.13.0 web';
 function isWeb(){return !(window.AndroidBridge&&window.AndroidBridge.appInfo);}
 function appInfo(){if(isWeb()){return {name:WEBVER,code:999999};}try{var s=window.AndroidBridge&&window.AndroidBridge.appInfo&&window.AndroidBridge.appInfo();if(s){var a=String(s).split('|');return {name:a[0],code:parseInt(a[1],10)||0};}}catch(e){}return null;}
 function devId(){if(isWeb()){return normDev(getDev());}try{return String((window.AndroidBridge&&window.AndroidBridge.deviceId&&window.AndroidBridge.deviceId())||'').replace(/[^A-Z0-9]/g,'');}catch(e){return '';}}
