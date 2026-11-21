@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#2F6B3F"><title>Télécharger Mon Poulailler</title>
+<style>
+:root{--g:#2F6B3F;--gd:#1F4A2B;--gb:#E6F0E8;--y:#F2B01E;--ink:#1F1F1F;--mut:#5F5F5F}
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#FBF8EE;color:var(--ink)}
+.hd{background:var(--g);color:#fff;padding:26px 16px 22px;text-align:center;border-bottom:6px solid var(--y)}.hd img{width:84px;height:84px;border-radius:20px;background:#fff;padding:4px}
+.hd h1{margin:10px 0 2px;font-size:26px}.hd p{margin:0;opacity:.92;font-size:15px}
+.w{max-width:480px;margin:0 auto;padding:0 16px 44px}
+.tabs{display:flex;gap:8px;margin-top:16px}.tabs button{flex:1;height:50px;border:2px solid var(--g);border-radius:14px;background:#fff;color:var(--g);font:inherit;font-weight:800;font-size:16px}
+.tabs button.on{background:var(--g);color:#fff}
+.box{background:#fff;border-radius:16px;padding:18px;margin-top:14px;box-shadow:0 2px 10px rgba(0,0,0,.06)}
+.btn{display:block;width:100%;text-align:center;text-decoration:none;margin-top:14px;padding:16px;border-radius:14px;background:var(--g);color:#fff;font-weight:800;font-size:18px;border:0;font-family:inherit}
+.btn.y{background:var(--y);color:#2b2100}.btn.w{background:#25D366;color:#073b1b}
+ol{padding-left:22px;margin:12px 0 0}li{margin:8px 0;line-height:1.4}h2{margin:0;font-size:19px;color:var(--gd)}
+.sm{font-size:13px;color:var(--mut);margin-top:10px}.shot{width:100%;border-radius:12px;margin-top:12px;border:1px solid #e4e4e4;display:block}
+.feat{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}.feat span{background:var(--gb);color:var(--gd);border-radius:999px;padding:6px 12px;font-weight:700;font-size:13px}
+[hidden]{display:none!important}
+</style></head><body>
+<div class="hd"><img src="logo-192.png" alt="Logo"><h1>Mon Poulailler</h1><p>Gérez vos poulets et vos pondeuses</p></div>
+<div class="w">
+<div class="tabs"><button id="tA" type="button">Android</button><button id="tI" type="button">iPhone</button></div>
+
+<div id="pA" class="box" hidden>
+<h2>Installer sur Android</h2>
+<a class="btn" id="dl" href="#">Télécharger l'application</a>
+<div class="sm" id="dlinfo"></div>
+<ol>
+<li>Touchez <b>Télécharger</b>. Si le navigateur demande de confirmer, choisissez <b>Télécharger quand même</b>.</li>
+<li>Ouvrez le fichier téléchargé (dans les notifications ou le dossier « Téléchargements »).</li>
+<li>Si le téléphone le demande, touchez <b>Paramètres</b> puis autorisez l'installation depuis cette source.</li>
+<li>Touchez <b>Installer</b>, puis <b>Ouvrir</b>.</li>
+</ol>
+<div class="sm">Gratuit pendant 30 jours. Aucune carte bancaire demandée.</div>
+</div>
+
+<div id="pI" class="box" hidden>
+<h2>Installer sur iPhone</h2>
+<div class="sm" style="margin-top:6px">Il faut utiliser <b>Safari</b> (la boussole bleue), pas WhatsApp ni Facebook.</div>
+<a class="btn" href="./">Ouvrir l'application</a>
+<div class="sm">Puis suivez ces 5 étapes. Installez l'application <b>avant</b> de saisir vos données.</div>
+<img class="shot" src="tuto-1.jpg" alt="Étape 1" loading="lazy"><img class="shot" src="tuto-2.jpg" alt="Étape 2" loading="lazy"><img class="shot" src="tuto-3.jpg" alt="Étape 3" loading="lazy"><img class="shot" src="tuto-4.jpg" alt="Étape 4" loading="lazy"><img class="shot" src="tuto-5.jpg" alt="Étape 5" loading="lazy">
+</div>
+
+<div class="box"><h2>Ce que fait l'application</h2>
+<div class="feat"><span>Dépenses</span><span>Stock d'aliment</span><span>Mortalité</span><span>Ventes et dettes</span><span>Bilan et bénéfices</span><span>Pondeuses</span><span>Vaccins</span><span>Commandes clients</span><span>Gérants</span></div></div>
+
+<a class="btn w" href="https://wa.me/22377333377?text=Bonjour%2C%20je%20veux%20des%20informations%20sur%20Mon%20Poulailler" id="wa">Une question ? Écrivez-nous sur WhatsApp</a>
+</div>
+<script>
+(function(){
+var q=new URLSearchParams(location.search),p=q.get('p')||'';
+var ios=/iPhone|iPad|iPod/.test(navigator.userAgent);
+if(p!=='android'&&p!=='ios'){p=ios?'ios':'android';}
+var A=document.getElementById('pA'),I=document.getElementById('pI'),tA=document.getElementById('tA'),tI=document.getElementById('tI');
+function show(x){A.hidden=x!=='android';I.hidden=x!=='ios';tA.classList.toggle('on',x==='android');tI.classList.toggle('on',x==='ios');}
+tA.onclick=function(){show('android');};tI.onclick=function(){show('ios');};show(p);
+var dl=document.getElementById('dl'),info=document.getElementById('dlinfo');
+dl.onclick=function(e){if(dl.getAttribute('href')==='#'){e.preventDefault();info.textContent='Le lien est en cours de chargement. Réessayez dans un instant, ou écrivez-nous sur WhatsApp.';}};
+fetch('https://firestore.googleapis.com/v1/projects/poulebox/databases/(default)/documents/app/update?key=AIzaSyDaAkRRkGchPMrBw6oVKb4fhSFb2qptuWM')
+.then(function(r){return r.ok?r.json():null;}).then(function(j){
+  var f=j&&j.fields,u=f&&f.url&&f.url.stringValue,n=f&&f.name&&f.name.stringValue;
+  if(u&&/^https:\/\//.test(u)){dl.href=u;if(n){info.textContent='Version '+n;}}
+  else{dl.textContent='Demander le lien sur WhatsApp';dl.href=document.getElementById('wa').href;}
+}).catch(function(){dl.textContent='Demander le lien sur WhatsApp';dl.href=document.getElementById('wa').href;});
+})();
+</script></body></html>
