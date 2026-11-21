@@ -2305,18 +2305,32 @@ function bindStat(){
 /* ---------- Centre : mises à jour + comptage des appareils ---------- */
 var CENTER={proj:'poulebox',key:'AIzaSyDaAkRRkGchPMrBw6oVKb4fhSFb2qptuWM'};
 function cenOn(){return !!(CENTER.proj&&CENTER.key);}
-var WEBVER='3.13.0 web';
+var WEBVER='3.14.0 web';
 function isWeb(){return !(window.AndroidBridge&&window.AndroidBridge.appInfo);}
 function appInfo(){if(isWeb()){return {name:WEBVER,code:999999};}try{var s=window.AndroidBridge&&window.AndroidBridge.appInfo&&window.AndroidBridge.appInfo();if(s){var a=String(s).split('|');return {name:a[0],code:parseInt(a[1],10)||0};}}catch(e){}return null;}
 function devId(){if(isWeb()){return normDev(getDev());}try{return String((window.AndroidBridge&&window.AndroidBridge.deviceId&&window.AndroidBridge.deviceId())||'').replace(/[^A-Z0-9]/g,'');}catch(e){return '';}}
+async function trialSync(id){
+  try{var r=await fetchT(fsBase(CENTER.proj)+'/devices/'+encodeURIComponent(id)+'?key='+encodeURIComponent(CENTER.key),{},12000);
+    if(!r.ok){return;}var d=fromFs((await r.json()).fields),sf=+d.first||0;
+    if(sf>0&&sf<=Date.now()){
+      if(!cfg.pfirst||sf<cfg.pfirst){cfg.pfirst=sf;saveCfg();}
+      if(lic.start&&sf<lic.start-6e4){lic.start=sf;saveLic();if(curRoute==='accueil'||curRoute==='abo'||curRoute==='licence'){route();}}}
+  }catch(e){}
+}
+function funnelBits(){
+  if(db.demo){return 0;}
+  var u=cfg.use||{};
+  return (db.bandes.length?1:0)|(db.depenses.length?2:0)|(db.ventes.length?4:0)|(db.stock.length?8:0)|(u.recu>0?16:0)|((cfg.fb&&cfg.fb.proj)?32:0);
+}
 async function centerPing(){
   var ai=appInfo(),id=devId(),now=Date.now();
   if(!cenOn()||!ai||!id||cfg.noStat){return;}
   if(cfg.ping&&now-cfg.ping<20*3600e3){return;}
+  await trialSync(id);
   if(!cfg.pfirst){cfg.pfirst=now;}
   var o={app:'poulailler',ver:ai.name,role:cfg.role||'',first:cfg.pfirst,last:now};
   try{var ls0=licOn()?licState():null,u=cfg.use||{},ch=db.bandes.filter(function(x){return !isP(x);}).length,po=db.bandes.filter(isP).length;
-    o.lic=ls0?ls0.mode:'';o.vc=db.demo?0:ch;o.vp=db.demo?0:po;o.us=u.sim||0;o.ur=u.recu||0;o.uc=u.code||0;o.ua=u.rap||0;}catch(e){}
+    o.lic=ls0?ls0.mode:'';o.vc=db.demo?0:ch;o.vp=db.demo?0:po;o.us=u.sim||0;o.ur=u.recu||0;o.uc=u.code||0;o.ua=u.rap||0;o.fn=funnelBits();}catch(e){}
   var qs=Object.keys(o).map(function(k){return 'updateMask.fieldPaths='+k;}).join('&');
   try{
     var r=await fetchT(fsBase(CENTER.proj)+'/devices/'+encodeURIComponent(id)+'?'+qs+'&key='+encodeURIComponent(CENTER.key),{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(toFs(o))},12000);
@@ -2377,15 +2391,15 @@ async function cenCount(){
     if(!r.ok){throw new Error(r.status===403?'Règles Firebase à mettre à jour':'Erreur du serveur ('+r.status+')');}
     var j=await r.json();(j.documents||[]).forEach(function(d){all.push(fromFs(d.fields));});pt=j.nextPageToken||'';n++;
   }while(pt&&n<30);
-  var now=Date.now(),a30=0,a7=0,ver={},role={},n7=0,n1=0,lic={},ret7=[0,0],ret30=[0,0],use={sim:0,recu:0,code:0,rap:0},usr={sim:0,recu:0,code:0,rap:0},vc=0,vp=0;
+  var now=Date.now(),a30=0,a7=0,ver={},role={},n7=0,n1=0,lic={},ret7=[0,0],ret30=[0,0],use={sim:0,recu:0,code:0,rap:0},usr={sim:0,recu:0,code:0,rap:0},vc=0,vp=0,fnc=[0,0,0,0,0,0];
   all.forEach(function(d){var l=+d.last||0;if(now-l<30*864e5){a30++;}if(now-l<7*864e5){a7++;}ver[d.ver||'?']=(ver[d.ver||'?']||0)+1;role[d.role||'?']=(role[d.role||'?']||0)+1;
     var f=+d.first||0;if(f&&now-f<7*864e5){n7++;}if(f&&now-f<864e5){n1++;}
     if(f&&now-f>=7*864e5){ret7[1]++;if(l-f>=7*864e5){ret7[0]++;}}
     if(f&&now-f>=30*864e5){ret30[1]++;if(l-f>=30*864e5){ret30[0]++;}}
     if(d.lic){lic[d.lic]=(lic[d.lic]||0)+1;}
-    vc+=+d.vc||0;vp+=+d.vp||0;
+    vc+=+d.vc||0;vp+=+d.vp||0;var fb=+d.fn||0;for(var q=0;q<6;q++){if(fb&(1<<q)){fnc[q]++;}}
     [['sim','us'],['recu','ur'],['code','uc'],['rap','ua']].forEach(function(p){var x=+d[p[1]]||0;use[p[0]]+=x;if(x>0){usr[p[0]]++;}});});
-  return {total:all.length,a30:a30,a7:a7,ver:ver,role:role,n7:n7,n1:n1,lic:lic,ret7:ret7,ret30:ret30,use:use,usr:usr,vc:vc,vp:vp};
+  return {total:all.length,a30:a30,a7:a7,ver:ver,role:role,n7:n7,n1:n1,lic:lic,ret7:ret7,ret30:ret30,use:use,usr:usr,vc:vc,vp:vp,fnc:fnc};
 }
 function cenCard(){
   return '<div class="card"><div class="h2">Utilisateurs de l\'application</div><div id="cenRes" class="sm" style="margin-bottom:10px">'+(cenOn()?'Touchez Actualiser.':'Centre non configuré dans cette version.')+'</div><button class="btn sm" type="button" id="cenBtn">Actualiser</button></div>'+
@@ -2405,6 +2419,7 @@ function cenBind(){
         '<div style="margin-top:4px">Reviennent après 7 jours : <b>'+(c.ret7[1]?Math.round(c.ret7[0]/c.ret7[1]*100)+' %':'—')+'</b> ('+c.ret7[0]+' sur '+c.ret7[1]+') · après 30 jours : <b>'+(c.ret30[1]?Math.round(c.ret30[0]/c.ret30[1]*100)+' %':'—')+'</b> ('+c.ret30[0]+' sur '+c.ret30[1]+')</div>'+
         '<div style="margin-top:4px">Licences : '+esc(Object.keys(c.lic).map(function(k){return (k==='paid'?'payantes':k==='trial'?'essai':k==='expired'?'expirées':k)+' : '+c.lic[k];}).join(' · ')||'pas encore de données (versions 3.8.1 et plus)')+'</div>'+
         '<div style="margin-top:4px">Vagues créées : '+c.vc+' poulets de chair · '+c.vp+' pondeuses</div>'+
+        '<div class="h2" style="margin-top:12px">Parcours des utilisateurs</div><div>Appareils : <b>'+c.total+'</b> · ont créé une vague : <b>'+c.fnc[0]+'</b> · une dépense : <b>'+c.fnc[1]+'</b> · une vente : <b>'+c.fnc[2]+'</b> · du stock : <b>'+c.fnc[3]+'</b> · un reçu : <b>'+c.fnc[4]+'</b> · envoi automatique : <b>'+c.fnc[5]+'</b></div><div class="sm" style="margin-top:4px">Versions 3.14 et plus seulement. Un nombre qui chute d\'une étape à l\'autre montre où les curieux abandonnent.</div>'+
         '<div class="h2" style="margin-top:12px">Fonctions utilisées</div><div>Simulateur : <b>'+c.use.sim+'</b> fois ('+c.usr.sim+' appareils) · Reçus : <b>'+c.use.recu+'</b> ('+c.usr.recu+') · Code de commande : <b>'+c.use.code+'</b> ('+c.usr.code+') · Rappels : <b>'+c.use.rap+'</b> ('+c.usr.rap+')</div>'+
         '<div class="sm" style="margin-top:6px">Les chiffres de fonctions et de licences viennent des appareils en version 3.8.1 ou plus.</div>';
     }catch(e){el.textContent=errMsg(e);}
