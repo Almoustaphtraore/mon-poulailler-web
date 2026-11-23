@@ -275,6 +275,7 @@ function stats(b){
     profit:venT-depT,rate:b.nb?dead/b.nb*100:0,costPlaced:b.nb?depT/b.nb:0,costSold:sold?depT/sold:0,avgPrice:sold?venP/sold:0};
 }
 function isP(b){return !!b&&b.type==='ponte';}
+function isK(b){return !!b&&b.type==='kuro';}
 function typesNow(){
   var a=db.bandes.filter(function(x){return !x.fin;});if(!a.length){a=db.bandes;}
   var p=a.some(isP),c=a.some(function(x){return !isP(x);});
@@ -386,7 +387,7 @@ function chips(g,opts,sel,cls,extra){
 function chipVal(g){var c=app.querySelector('.chip.on[data-g="'+g+'"]');return c?c.dataset.v:'';}
 function bsel(){
   return '<select class="in sel" id="bsel" aria-label="Vague">'+db.bandes.map(function(b){
-    return '<option value="'+b.id+'"'+(b.id===db.cur?' selected':'')+'>'+(isP(b)?'🥚 ':'')+esc(b.nom)+' · jour '+dayN(b)+(b.fin?' (terminée)':'')+'</option>';}).join('')+'</select>';
+    return '<option value="'+b.id+'"'+(b.id===db.cur?' selected':'')+'>'+(isP(b)?'🥚 ':(isK(b)?'🐓 ':''))+esc(b.nom)+' · jour '+dayN(b)+(b.fin?' (terminée)':'')+'</option>';}).join('')+'</select>';
 }
 function bindBsel(){var s=$('#bsel');if(s){s.onchange=function(){db.cur=s.value;save();route();};}}
 function itemQty(i){return fmt1(i.qty)+' '+esc(i.unit);}
@@ -412,6 +413,7 @@ function demoEnd(){
   cfg.role='';saveCfg();save();toast("Exemple supprimé : créez votre vraie vague");location.hash='#/bande/new';route();
 }
 function vHome(){
+  if(isK(curBande())){return vKuro();}
   var b=curBande(),s=stats(b),alerts=[],P=isP(b);
   db.stock.forEach(function(i){if(i.qty<=i.seuil){alerts.push('Stock bas : '+esc(i.nom)+' ('+itemQty(i)+')');}});
   var resv=sum(db.commandes.filter(function(c){return c.b===b.id;}),'qty');
@@ -459,7 +461,6 @@ function vHome(){
 }
 function vReglages(){
   var html='<div class="screen"><div class="ttl"><a class="back" href="#/accueil" aria-label="Retour">‹</a><h1>Réglages</h1></div>'+
-  '<a class="btn" href="#/kuro">🐓 Kuroiler : œufs fécondés et couvée</a>'+
   '<a class="btn alt" href="#/employes">Gérants et envoi automatique</a>'+
   '<a class="btn alt" href="#/securite">'+(pinOn()?'🔒 Code de verrouillage (activé)':'Code de verrouillage')+'</a>'+
   '<a class="btn alt" href="#/licence">Ma licence</a>'+
@@ -477,6 +478,7 @@ function vReglages(){
 
 /* ---------- Dépenses ---------- */
 function vDep(){
+  if(isK(curBande())){return vKuro('dep');}
   var b=curBande(),s=stats(b);
   var cats=CATS.map(function(c){return {c:c,t:sum(s.dep.filter(function(x){return x.cat===c;}),'total')};}).filter(function(x){return x.t>0;});
   var list=s.dep.filter(function(x){return ui.depCat==='Tout'||x.cat===ui.depCat;}).sort(function(a,c){return c.date.localeCompare(a.date)||c.ts-a.ts;});
@@ -617,6 +619,7 @@ function vSaisie(){
 
 /* ---------- Ventes ---------- */
 function vVentes(){
+  if(isK(curBande())){return vKuro('vente');}
   var b=curBande(),s=stats(b);
   var list=s.ve.slice().sort(function(a,c){return c.date.localeCompare(a.date)||c.ts-a.ts;});
   var html='<div class="screen"><div class="top"><h1>Ventes</h1>'+bsel()+'</div>'+
@@ -724,8 +727,8 @@ function vOeufs(){
 /* ---------- Bandes ---------- */
 function vBandes(){
   curBande();
-  var html='<div class="screen"><div class="top"><h1>Vagues</h1></div><a class="btn" href="#/bande/new">+ Nouvelle vague</a><a class="btn alt" href="#/kuro">🐓 Kuroiler : œufs fécondés et couvée</a>'+
-  db.bandes.slice().reverse().map(function(b){var s=stats(b);
+  var html='<div class="screen"><div class="top"><h1>Vagues</h1></div><a class="btn" href="#/bande/new">+ Nouvelle vague</a>'+
+  db.bandes.slice().reverse().map(function(b){if(isK(b)){var K=kStats(b);return '<div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><div class="h2" style="margin:0">🐓 '+esc(b.nom)+'</div>'+(b.id===db.cur?'<span class="tag" style="background:var(--greenBg);color:var(--greenDk)">Vague affichée</span>':'')+'</div><div class="sm" style="margin:6px 0 10px">Kuroiler · départ le '+fd(b.date)+'/'+b.date.slice(0,4)+' · '+(b.k&&b.k.poules||0)+' poules, '+(b.k&&b.k.coqs||0)+' coqs'+(b.fin?' · terminée':'')+'</div><div class="row" style="margin-bottom:12px"><div><div class="sm">Œufs</div><b>'+K.oDispo+'</b></div><div><div class="sm">Poussins</div><b>'+K.pDispo+'</b></div><div><div class="sm">'+(K.gain<0?'Perte':'Bénéfice')+'</div><b>'+fmt(Math.abs(K.gain))+'</b></div></div><div class="row">'+(b.id!==db.cur?'<button class="btn alt sm" style="padding:0 4px;font-size:14px" type="button" data-pick="'+b.id+'">Afficher</button>':'')+'<button class="btn alt sm" style="padding:0 4px;font-size:14px" type="button" data-fin="'+b.id+'">'+(b.fin?'Rouvrir':'Terminer')+'</button><button class="btn danger sm" style="padding:0 4px;font-size:14px" type="button" data-delb="'+b.id+'">Supprimer</button></div></div>';}var s=stats(b);
     return '<div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><div class="h2" style="margin:0">'+esc(b.nom)+'</div>'+(b.id===db.cur?'<span class="tag" style="background:var(--greenBg);color:var(--greenDk)">Vague affichée</span>':'')+'</div>'+
     '<div class="sm" style="margin:6px 0 10px">'+(isP(b)?'🥚 Ponte · ':'')+'Arrivée le '+fd(b.date)+'/'+b.date.slice(0,4)+' · '+b.nb+(isP(b)?' pondeuses':' poussins')+' · jour '+dayN(b)+(b.fin?' · terminée':'')+'</div>'+
     '<div class="row" style="margin-bottom:12px"><div><div class="sm">Vivants</div><b>'+s.alive+'</b></div><div><div class="sm">Mortalité</div><b class="mort">'+pct(s.rate)+'</b></div><div><div class="sm">'+(s.profit<0?'Perte':'Bénéfice')+'</div><b>'+fmt(Math.abs(s.profit))+'</b></div></div>'+
@@ -734,28 +737,30 @@ function vBandes(){
 }
 function vBandeForm(){
   var first=!db.bandes.length;
-  var html='<div class="screen">'+(first?'<div class="welcome"><div class="logo" data-vtap="1">'+LOGO+'</div><h1>Bienvenue dans Mon Poulailler</h1><p>Gérez vos poulets de chair et vos pondeuses : dépenses, stock, mortalité, ponte et ventes.</p></div>'+((cfg.pfirst&&Date.now()-cfg.pfirst>18*36e5)?'<div class="box yelbox" style="margin-bottom:12px"><b>Bon retour !</b><div class="sm" style="color:var(--yelDk)">Remplissez les deux cases ci-dessous et touchez « Commencer » : votre première vague est prête en 1 minute.</div></div>':''):'<div class="ttl"><a class="back" href="#/bandes" aria-label="Retour">‹</a><h1>Nouvelle vague</h1></div>')+
+  var html='<div class="screen">'+(first?'<div class="welcome"><div class="logo" data-vtap="1">'+LOGO+'</div><h1>Bienvenue dans Mon Poulailler</h1><p>Gérez vos poulets de chair, vos pondeuses et vos Kuroiler : dépenses, stock, mortalité, ponte et ventes.</p></div>'+((cfg.pfirst&&Date.now()-cfg.pfirst>18*36e5)?'<div class="box yelbox" style="margin-bottom:12px"><b>Bon retour !</b><div class="sm" style="color:var(--yelDk)">Remplissez les deux cases ci-dessous et touchez « Commencer » : votre première vague est prête en 1 minute.</div></div>':''):'<div class="ttl"><a class="back" href="#/bandes" aria-label="Retour">‹</a><h1>Nouvelle vague</h1></div>')+
   '<form id="f" onsubmit="return false"><div class="fld"><div class="l">Type d\'élevage</div>'+chips('typ',['Poulets de chair','Pondeuses','Kuroiler'],'Poulets de chair')+'</div><div class="fld"><label class="l" for="f_nom">Nom de la vague</label><input class="in" id="f_nom" type="text" value="Vague '+(db.bandes.length+1)+'"></div>'+
   '<div class="row fld"><div><label class="l" for="f_date" id="l_date">Date d\'arrivée des poussins</label><input class="in" id="f_date" type="date" value="'+todayISO()+'"></div><div><label class="l" for="f_nb" id="l_nb">Nombre de poussins</label><input class="in" id="f_nb" type="text" inputmode="numeric" placeholder="ex. : 500"></div></div>'+
   '<div class="fld"><label class="l" for="f_pu" id="l_pu">Prix d\'un poussin en FCFA (facultatif)</label><input class="in" id="f_pu" type="text" inputmode="decimal" placeholder="ex. : 900"><div class="sm" style="margin-top:6px" id="l_pn">Si vous le remplissez, l\'achat des poussins est ajouté aux dépenses.</div></div>'+
+  '<div class="fld" id="w_coq" style="display:none"><label class="l" for="f_coq">Nombre de coqs</label><input class="in" id="f_coq" type="text" inputmode="numeric" placeholder="ex. : 4"><div class="sm" style="margin-top:6px">Conseil : 1 coq pour 5 poules.</div></div>'+
   '<div class="fld" id="w_age" style="display:none"><label class="l" for="f_age">Âge à l\'arrivée en semaines (facultatif)</label><input class="in" id="f_age" type="text" inputmode="numeric" placeholder="ex. : 18 (pondeuses prêtes à pondre)"></div>'+
   '<button class="btn" type="button" id="save">'+(first?'Commencer':'Créer la vague')+'</button></form>'+
   (first?'<button class="btn alt" type="button" data-demo="1" style="margin-top:12px">👀 Voir un exemple (sans rien saisir)</button><div class="sm" style="text-align:center;margin:8px 0 14px">Un élevage fictif pour découvrir l\'application en 1 minute.</div>':'')+
   (first?'<div class="card" style="margin-top:6px"><div class="sm" style="margin-bottom:8px">Vous avez déjà une sauvegarde ?</div><button class="btn alt sm" type="button" data-import="1">Importer une sauvegarde</button><input type="file" id="impfile" accept=".json,application/json" hidden></div>':'')+
   (first?'<button class="btn alt" type="button" data-role="worker" style="height:60px;font-size:17px;margin-top:16px">👷 Je suis gérant (j\'ai un code)</button>'+iosHint()+'<div class="sm" style="text-align:center;margin-top:10px">Un identifiant anonyme du téléphone et la version de l\'application sont envoyés une fois par jour pour compter les utilisateurs. Aucune donnée d\'élevage n\'est envoyée.</div>':'')+'</div>';
   return {html:html,theme:'t-green',init:function(){
-    var tp=function(){return chipVal('typ')==='Pondeuses';};
-    hooks.chip=function(g){if(g!=='typ'){return;}if(chipVal('typ')==='Kuroiler'){location.hash='#/kuro';return;}var p=tp();
-      $('#l_date').textContent=p?'Date d\'arrivée des pondeuses':'Date d\'arrivée des poussins';$('#l_nb').textContent=p?'Nombre de pondeuses':'Nombre de poussins';
-      $('#l_pu').textContent=p?'Prix d\'une pondeuse en FCFA (facultatif)':'Prix d\'un poussin en FCFA (facultatif)';$('#l_pn').textContent=p?'Si vous le remplissez, l\'achat des pondeuses est ajouté aux dépenses.':'Si vous le remplissez, l\'achat des poussins est ajouté aux dépenses.';
-      $('#w_age').style.display=p?'':'none';};
+    var tp=function(){return chipVal('typ')==='Pondeuses';},kz=function(){return chipVal('typ')==='Kuroiler';};
+    hooks.chip=function(g){if(g!=='typ'){return;}var p=tp(),K=kz();
+      $('#l_date').textContent=K?'Date de démarrage du troupeau':(p?'Date d\'arrivée des pondeuses':'Date d\'arrivée des poussins');$('#l_nb').textContent=K?'Nombre de poules':(p?'Nombre de pondeuses':'Nombre de poussins');
+      $('#l_pu').textContent=K?'Prix d\'un sujet en FCFA (facultatif)':(p?'Prix d\'une pondeuse en FCFA (facultatif)':'Prix d\'un poussin en FCFA (facultatif)');$('#l_pn').textContent=K?'Si vous le remplissez, l\'achat des sujets est ajouté aux dépenses Kuroiler.':(p?'Si vous le remplissez, l\'achat des pondeuses est ajouté aux dépenses.':'Si vous le remplissez, l\'achat des poussins est ajouté aux dépenses.');
+      $('#w_age').style.display=p?'':'none';$('#w_coq').style.display=K?'':'none';};
     $('#save').onclick=function(){
       var nb=Math.floor(num($('#f_nb').value));
-      if(!(nb>0)){toast(tp()?'Saisissez le nombre de pondeuses':'Saisissez le nombre de poussins');return;}
+      if(!(nb>0)){toast(kz()?'Saisissez le nombre de poules':(tp()?'Saisissez le nombre de pondeuses':'Saisissez le nombre de poussins'));return;}
       var b={id:uid(),nom:$('#f_nom').value.trim()||('Vague '+(db.bandes.length+1)),date:$('#f_date').value||todayISO(),nb:nb};
       if(tp()){b.type='ponte';var ag=Math.floor(num($('#f_age').value));if(ag>0){b.age0=ag;}}
-      db.bandes.push(b);db.cur=b.id;
       var pu=num($('#f_pu').value);
+      if(kz()){var cq=Math.max(0,Math.floor(num($('#f_coq').value)));b.type='kuro';b.nb=nb+cq;b.k={coqs:cq,poules:nb,ratio:5,ponte:[],lots:[],ventes:[],dep:[],chair:[]};if(pu>0){b.k.dep.push({id:uid(),date:b.date,label:'Achat des sujets',montant:Math.round((nb+cq)*pu)});}pu=0;}
+      db.bandes.push(b);db.cur=b.id;
       if(pu>0){db.depenses.push({id:uid(),ts:Date.now(),b:b.id,date:b.date,cat:'Poussins',desig:tp()?'Pondeuses':"Poussins d'un jour",qty:nb,unit:'unité',pu:pu,total:Math.round(nb*pu),four:'',pay:'Espèces',note:''});}
       save();toast('Vague créée');location.hash='#/accueil';
     };
@@ -2162,10 +2167,10 @@ function vAide(){
   }};
 }
 /* ---------- Kuroiler : reproducteurs, œufs fécondés, couvée ---------- */
-function kd(){var k=db.kuro=db.kuro||{};k.coqs=k.coqs||0;k.poules=k.poules||0;k.ratio=k.ratio||5;k.ponte=k.ponte||[];k.lots=k.lots||[];k.ventes=k.ventes||[];k.dep=k.dep||[];k.chair=k.chair||[];return k;}
+function kd(b){b=b||curBande();var k=b.k=b.k||{};k.coqs=k.coqs||0;k.poules=k.poules||0;k.ratio=k.ratio||5;k.ponte=k.ponte||[];k.lots=k.lots||[];k.ventes=k.ventes||[];k.dep=k.dep||[];k.chair=k.chair||[];return k;}
 function dayDiff(a,b){return Math.round((new Date(b+'T12:00:00')-new Date(a+'T12:00:00'))/864e5);}
-function kStats(){
-  var k=kd(),lay=0,cas=0;k.ponte.forEach(function(x){lay+=x.n;cas+=x.casses||0;});
+function kStats(b){
+  var k=kd(b),lay=0,cas=0;k.ponte.forEach(function(x){lay+=x.n;cas+=x.casses||0;});
   var oV=0,pV=0,rec=0,due=0,dep=sum(k.dep,'montant'),set=sum(k.lots,'n'),ecl=0,clr=0;
   k.ventes.forEach(function(v){var t=Math.round(v.qty*v.pu);rec+=Math.min(t,v.paye==null?t:v.paye);due+=Math.max(0,t-(v.paye==null?t:v.paye));if(v.kind==='oeuf'){oV+=v.qty;}else{pV+=v.qty;}});
   k.lots.forEach(function(l){if(l.done){ecl+=l.eclos||0;}clr+=l.clairs||0;});
@@ -2183,53 +2188,62 @@ function kLotInfo(l){
   else{t='Tournez les œufs 2 à 3 fois par jour. Éclosion dans '+(21-j)+' jours.';}
   return {j:Math.max(0,Math.min(21,j)),t:t};
 }
-function vKuro(){
-  var k=kd(),S=kStats(),td=todayISO(),pc=k.poules?Math.round(100*(S.lay&&k.ponte.length?(function(){var w=k.ponte.filter(function(x){return dayDiff(x.date,td)<7&&dayDiff(x.date,td)>=0;});return sum(w,'n')/(Math.max(1,Math.min(7,w.length))*k.poules);})():0)):0;
+function vKuro(mode){
+  var KB=curBande(),k=kd(KB),S=kStats(KB),td=todayISO(),pc=k.poules?Math.round(100*(S.lay&&k.ponte.length?(function(){var w=k.ponte.filter(function(x){return dayDiff(x.date,td)<7&&dayDiff(x.date,td)>=0;});return sum(w,'n')/(Math.max(1,Math.min(7,w.length))*k.poules);})():0)):0;
   var need=k.poules?Math.ceil(k.poules/k.ratio):0,ok=k.coqs>=need;
   var fld=function(id,l,ph,v,mode){return '<div class="fld"><label class="l" for="'+id+'">'+l+'</label><input class="in" id="'+id+'" type="text" inputmode="'+(mode||'numeric')+'" placeholder="'+(ph||'')+'" value="'+(v==null?'':esc(v))+'" autocomplete="off"></div>';};
-  var h='<div class="screen"><div class="ttl"><a class="back" href="#/reglages" aria-label="Retour">‹</a><h1>🐓 Kuroiler</h1></div>'+
-  '<div class="sm" style="margin-bottom:12px">Reproducteurs, œufs fécondés, couvée et poussins. Tout est séparé de vos vagues de chair.</div>'+
-  '<div class="card"><div class="h2">Mon bilan Kuroiler</div><div class="row"><div><div class="sm">Œufs à couver ou vendre</div><div class="big">'+S.oDispo+'</div></div><div><div class="sm">Poussins disponibles</div><div class="big">'+S.pDispo+'</div></div></div>'+
+  var h='<div class="screen"><div class="top"><h1>🐓 '+(mode==='dep'?'Dépenses':(mode==='vente'?'Ventes':'Kuroiler'))+'</h1>'+bsel()+'</div>'+
+  '<div class="sm" style="margin-bottom:12px">Reproducteurs, œufs fécondés, couvée et poussins.</div>'+
+  '<!--K:bil--><div class="card"><div class="h2">Mon bilan Kuroiler</div><div class="row"><div><div class="sm">Œufs à couver ou vendre</div><div class="big">'+S.oDispo+'</div></div><div><div class="sm">Poussins disponibles</div><div class="big">'+S.pDispo+'</div></div></div>'+
   '<div class="row" style="margin-top:10px"><div><div class="sm">Encaissé</div><div class="big" style="font-size:17px">'+fmt(S.rec)+' F</div></div><div><div class="sm">Dépenses</div><div class="big" style="font-size:17px">'+fmt(S.dep)+' F</div></div></div>'+
   '<div class="sm" style="margin-top:8px">Bénéfice : <b class="'+(S.gain>=0?'':'mort')+'">'+(S.gain>=0?'+':'−')+fmt(Math.abs(S.gain))+' F</b>'+(S.due?' · À encaisser : <b>'+fmt(S.due)+' F</b>':'')+'</div></div>'+
-  '<div class="card"><div class="h2">Mes reproducteurs</div><div class="row">'+fld('k_coq','Coqs','4',k.coqs||'')+fld('k_pou','Poules','20',k.poules||'')+'</div>'+fld('k_rat','Poules pour 1 coq (conseil : 5)','5',k.ratio,'numeric')+
+  '<!--K:rep--><div class="card"><div class="h2">Mes reproducteurs</div><div class="row">'+fld('k_coq','Coqs','4',k.coqs||'')+fld('k_pou','Poules','20',k.poules||'')+'</div>'+fld('k_rat','Poules pour 1 coq (conseil : 5)','5',k.ratio,'numeric')+
   '<div class="sm">'+(k.poules?(ok?'Rapport respecté : 1 coq pour '+(k.coqs?Math.round(k.poules/k.coqs*10)/10:'—')+' poules.':'<span class="mort">Il faut au moins '+need+' coq'+(need>1?'s':'')+' pour '+k.poules+' poules, sinon moins d\'œufs fécondés.</span>'):'Indiquez le nombre de poules.')+'</div><button class="btn alt" type="button" id="k_save" style="margin-top:10px">Enregistrer</button></div>'+
-  '<div class="card"><div class="h2">Ponte du jour</div>'+(k.poules?'<div class="sm" style="margin-bottom:6px">Taux de ponte sur 7 jours : <b>'+pc+' %</b></div>':'')+'<div class="row">'+fld('k_oeufs','Œufs ramassés','12','')+fld('k_cas','Dont cassés','0','')+'</div><button class="btn" type="button" id="k_ponte">Noter la ponte</button>'+
+  '<!--K:pon--><div class="card"><div class="h2">Ponte du jour</div>'+(k.poules?'<div class="sm" style="margin-bottom:6px">Taux de ponte sur 7 jours : <b>'+pc+' %</b></div>':'')+'<div class="row">'+fld('k_oeufs','Œufs ramassés','12','')+fld('k_cas','Dont cassés','0','')+'</div><button class="btn" type="button" id="k_ponte">Noter la ponte</button>'+
   (k.ponte.length?'<div class="sm" style="margin-top:8px">Dernières : '+k.ponte.slice(-5).reverse().map(function(x){return fd(x.date)+' : '+x.n;}).join(' · ')+'</div>':'')+'</div>'+
-  '<div class="card"><div class="h2">Couvée (incubateur)</div><div class="row">'+fld('k_ln','Œufs mis','60','')+'<div class="fld"><label class="l" for="k_ld">Date de mise</label><input class="in" id="k_ld" type="date" value="'+td+'"></div></div><button class="btn" type="button" id="k_lot">Mettre en incubation</button>'+
+  '<!--K:cou--><div class="card"><div class="h2">Couvée (incubateur)</div><div class="row">'+fld('k_ln','Œufs mis','60','')+'<div class="fld"><label class="l" for="k_ld">Date de mise</label><input class="in" id="k_ld" type="date" value="'+td+'"></div></div><button class="btn" type="button" id="k_lot">Mettre en incubation</button>'+
   (k.lots.length?k.lots.slice().reverse().map(function(l){var i=kLotInfo(l);return '<div class="card" style="margin:10px 0 0"><div style="display:flex;justify-content:space-between"><b>'+l.n+' œufs · mis le '+fd(l.date)+'</b><span class="tag">'+(l.done?'Terminé':'J'+i.j+' / 21')+'</span></div>'+
     (l.done?'':'<div style="height:8px;border-radius:5px;background:var(--greenB);margin:8px 0"><div style="height:8px;border-radius:5px;background:var(--green);width:'+Math.round(i.j/21*100)+'%"></div></div>')+'<div class="sm">'+i.t+(l.clairs?' · '+l.clairs+' œufs clairs retirés':'')+'</div>'+
     (l.done?'':'<div class="row" style="margin-top:8px"><button class="btn alt sm" type="button" data-kclair="'+l.id+'">Retirer des œufs clairs</button><button class="btn sm" type="button" data-kecl="'+l.id+'">Noter l\'éclosion</button></div>')+'</div>';}).join(''):'')+
   '<div class="sm" style="margin-top:8px">Repères : mirage vers J7 et J14, arrêt du retournement vers J18, éclosion à J21.</div></div>'+
-  '<div class="card"><div class="h2">Vendre</div><div class="fld"><div class="l">Quoi ?</div>'+chips('kk',['Œufs fécondés','Poussins'],'Œufs fécondés')+'</div><div class="row">'+fld('k_vq','Quantité','30','')+fld('k_vp','Prix unité (F)','300','')+'</div>'+fld('k_vc','Client (facultatif)','Nom','','text')+fld('k_vpa','Payé tout de suite (F), vide = tout payé','','')+
+  '<!--K:ven--><div class="card"><div class="h2">Vendre</div><div class="fld"><div class="l">Quoi ?</div>'+chips('kk',['Œufs fécondés','Poussins'],'Œufs fécondés')+'</div><div class="row">'+fld('k_vq','Quantité','30','')+fld('k_vp','Prix unité (F)','300','')+'</div>'+fld('k_vc','Client (facultatif)','Nom','','text')+fld('k_vpa','Payé tout de suite (F), vide = tout payé','','')+
   '<div class="fld"><div class="l">Origine des parents</div>'+chips('kg',['Parents importés','Issus de parents Kuroiler'],'Parents importés')+'<div class="sm" style="margin-top:6px">Les poussins de 2e génération sont souvent moins performants : le client doit le savoir.</div></div><button class="btn" type="button" id="k_vend">Enregistrer la vente</button>'+
-  (k.ventes.length?k.ventes.slice(-6).reverse().map(function(v){var t=Math.round(v.qty*v.pu),r=t-(v.paye==null?t:v.paye);return '<div class="sm" style="margin-top:8px;border-top:1px solid var(--greenB);padding-top:8px"><b>'+v.qty+' '+(v.kind==='oeuf'?'œufs fécondés':'poussins')+'</b> · '+fmt(t)+' F · '+fd(v.date)+(v.client?' · '+esc(v.client):'')+(v.gen?' · '+esc(v.gen):'')+(r>0?' <span class="mort">reste '+fmt(r)+' F</span> <button class="chip sm" type="button" data-kpay="'+v.id+'">Encaissé</button>':'')+'</div>';}).join(''):'')+'</div>'+
-  (S.pDispo>0?'<div class="card"><div class="h2">Passer en chair</div><div class="sm" style="margin-bottom:8px">Gardez des poussins pour les engraisser : une vague de chair est créée dans l\'application (aliment, mortalité, ventes).</div>'+fld('k_cn','Nombre de poussins à engraisser','',S.pDispo)+'<button class="btn" type="button" id="k_chair">Créer la vague de chair</button></div>':'')+
-  '<div class="card"><div class="h2">Dépense Kuroiler</div>'+fld('k_dl','Quoi ? (aliment, charbon…)','Aliment reproducteurs','','text')+fld('k_dm','Montant (F)','5000','')+'<button class="btn alt" type="button" id="k_dep">Ajouter la dépense</button></div></div>';
+  (k.ventes.length?k.ventes.slice(mode==='vente'?-60:-6).reverse().map(function(v){var t=Math.round(v.qty*v.pu),r=t-(v.paye==null?t:v.paye);return '<div class="sm" style="margin-top:8px;border-top:1px solid var(--greenB);padding-top:8px"><b>'+v.qty+' '+(v.kind==='oeuf'?'œufs fécondés':'poussins')+'</b> · '+fmt(t)+' F · '+fd(v.date)+(v.client?' · '+esc(v.client):'')+(v.gen?' · '+esc(v.gen):'')+(r>0?' <span class="mort">reste '+fmt(r)+' F</span> <button class="chip sm" type="button" data-kpay="'+v.id+'">Encaissé</button>':'')+'</div>';}).join(''):'')+'</div>'+
+  (S.pDispo>0?'<!--K:cha--><div class="card"><div class="h2">Passer en chair</div><div class="sm" style="margin-bottom:8px">Gardez des poussins pour les engraisser : une vague de chair est créée dans l\'application (aliment, mortalité, ventes).</div>'+fld('k_cn','Nombre de poussins à engraisser','',S.pDispo)+'<button class="btn" type="button" id="k_chair">Créer la vague de chair</button></div>':'')+
+  '<!--K:dep--><div class="card"><div class="h2">Dépense Kuroiler</div>'+fld('k_dl','Quoi ? (aliment, charbon…)','Aliment reproducteurs','','text')+fld('k_dm','Montant (F)','5000','')+'<button class="btn alt" type="button" id="k_dep">Ajouter la dépense</button></div></div>';
+  if(mode){
+    var pp=h.split(/(?=<!--K:)/),head=pp.shift();pp[pp.length-1]=pp[pp.length-1].replace(/<\/div>$/,'');
+    var keep=mode==='dep'?['bil','dep']:['bil','ven'];
+    h=head+pp.filter(function(x){return keep.indexOf(x.slice(6,9))>=0;}).join('');
+    if(mode==='dep'){h+='<div class="card"><div class="h2">Toutes les dépenses</div>'+(k.dep.length?k.dep.slice().reverse().map(function(d){return '<div class="line"><span>'+esc(d.label)+' <span class="sm">'+fd(d.date)+'</span></span><span><b>'+fmt(d.montant)+' F</b> <button class="chip sm" type="button" data-kdel="'+d.id+'">Supprimer</button></span></div>';}).join(''):'<div class="sm">Aucune dépense notée.</div>')+'</div>';}
+    h+='</div>';
+  }
   return {html:h,theme:'t-green',init:function(){
-    var done=function(m){save();toast(m);route();};
-    $('#k_save').onclick=function(){k.coqs=Math.max(0,Math.floor(num($('#k_coq').value)));k.poules=Math.max(0,Math.floor(num($('#k_pou').value)));k.ratio=Math.max(1,Math.floor(num($('#k_rat').value))||5);done('Enregistré');};
-    $('#k_ponte').onclick=function(){var n=Math.floor(num($('#k_oeufs').value)),c=Math.floor(num($('#k_cas').value));if(!(n>0)){toast('Indiquez les œufs ramassés');return;}
+    bindBsel();var done=function(m){save();toast(m);route();};
+    ($('#k_save')||{}).onclick=function(){k.coqs=Math.max(0,Math.floor(num($('#k_coq').value)));k.poules=Math.max(0,Math.floor(num($('#k_pou').value)));k.ratio=Math.max(1,Math.floor(num($('#k_rat').value))||5);done('Enregistré');};
+    ($('#k_ponte')||{}).onclick=function(){var n=Math.floor(num($('#k_oeufs').value)),c=Math.floor(num($('#k_cas').value));if(!(n>0)){toast('Indiquez les œufs ramassés');return;}
       var e=k.ponte.filter(function(x){return x.date===td;})[0];if(e){e.n+=n;e.casses=(e.casses||0)+Math.min(c,n);}else{k.ponte.push({id:uid(),date:td,n:n,casses:Math.min(c,n)});}done('Ponte notée');};
-    $('#k_lot').onclick=function(){var n=Math.floor(num($('#k_ln').value));if(!(n>0)){toast('Indiquez le nombre d\'œufs');return;}if(n>S.oDispo&&!confirm('Vous avez noté seulement '+S.oDispo+' œufs disponibles. Continuer ?')){return;}
+    ($('#k_lot')||{}).onclick=function(){var n=Math.floor(num($('#k_ln').value));if(!(n>0)){toast('Indiquez le nombre d\'œufs');return;}if(n>S.oDispo&&!confirm('Vous avez noté seulement '+S.oDispo+' œufs disponibles. Continuer ?')){return;}
       k.lots.push({id:uid(),date:$('#k_ld').value||td,n:n,clairs:0,eclos:0,done:0});done('Lot mis en incubation');};
     app.querySelectorAll('[data-kclair]').forEach(function(b){b.onclick=function(){var v=prompt('Combien d\'œufs clairs retirés ?','0'),l=k.lots.filter(function(x){return x.id===b.dataset.kclair;})[0];if(l&&v!==null){l.clairs=(l.clairs||0)+Math.max(0,Math.floor(num(v)));done('Noté');}};});
     app.querySelectorAll('[data-kecl]').forEach(function(b){b.onclick=function(){var l=k.lots.filter(function(x){return x.id===b.dataset.kecl;})[0],v=prompt('Combien de poussins sont nés ?','0');if(l&&v!==null){l.eclos=Math.min(l.n,Math.max(0,Math.floor(num(v))));l.done=1;done('Éclosion notée');}};});
-    $('#k_vend').onclick=function(){var q=Math.floor(num($('#k_vq').value)),p=num($('#k_vp').value),kind=chipVal('kk')==='Poussins'?'poussin':'oeuf';
+    ($('#k_vend')||{}).onclick=function(){var q=Math.floor(num($('#k_vq').value)),p=num($('#k_vp').value),kind=chipVal('kk')==='Poussins'?'poussin':'oeuf';
       if(!(q>0)||!(p>0)){toast('Indiquez la quantité et le prix');return;}
       if(kind==='oeuf'&&q>S.oDispo&&!confirm('Vous avez noté seulement '+S.oDispo+' œufs disponibles. Continuer ?')){return;}
       if(kind==='poussin'&&q>S.pDispo&&!confirm('Vous avez noté seulement '+S.pDispo+' poussins disponibles. Continuer ?')){return;}
       var pa=$('#k_vpa').value.trim();k.ventes.push({id:uid(),date:td,kind:kind,qty:q,pu:p,client:$('#k_vc').value.trim(),paye:pa===''?null:Math.max(0,num(pa)),gen:chipVal('kg')});done('Vente enregistrée');};
+    app.querySelectorAll('[data-kdel]').forEach(function(b){b.onclick=function(){if(confirm('Supprimer cette dépense ?')){k.dep=k.dep.filter(function(x){return x.id!==b.dataset.kdel;});done('Supprimée');}};});
     app.querySelectorAll('[data-kpay]').forEach(function(b){b.onclick=function(){var v=k.ventes.filter(function(x){return x.id===b.dataset.kpay;})[0];if(v){v.paye=null;done('Encaissé');}};});
     var ch=$('#k_chair');if(ch){ch.onclick=function(){var n=Math.floor(num($('#k_cn').value));if(!(n>0)||n>S.pDispo){toast('Choisissez entre 1 et '+S.pDispo+' poussins');return;}
       var b={id:uid(),nom:'Kuroiler chair '+(k.chair.length+1),date:td,nb:n};db.bandes.push(b);db.cur=b.id;k.chair.push({id:b.id,n:n,date:td});save();toast('Vague de chair créée');location.hash='#/accueil';};}
-    $('#k_dep').onclick=function(){var m=num($('#k_dm').value);if(!(m>0)){toast('Indiquez le montant');return;}k.dep.push({id:uid(),date:td,label:$('#k_dl').value.trim()||'Dépense',montant:Math.round(m)});done('Dépense ajoutée');};
+    ($('#k_dep')||{}).onclick=function(){var m=num($('#k_dm').value);if(!(m>0)){toast('Indiquez le montant');return;}k.dep.push({id:uid(),date:td,label:$('#k_dl').value.trim()||'Dépense',montant:Math.round(m)});done('Dépense ajoutée');};
   }};
 }
 function route(){
   applyTheme();
   var parts=(location.hash||'#/accueil').split('/'),r=parts[1]||'accueil',arg=parts[2];
   hooks={};curRoute=r;
+  if(db.kuro&&db.bandes.length){if(!db.bandes.some(isK)){db.bandes.push({id:uid(),nom:'Kuroiler',date:todayISO(),nb:(db.kuro.poules||0)+(db.kuro.coqs||0),type:'kuro',k:db.kuro});}delete db.kuro;save();}
   if(r==='vendeur'){render(vVendeur(),r);return;}
   if(!cfg.role){
     if(db.bandes.length){cfg.role='owner';saveCfg();}
@@ -2255,7 +2269,7 @@ function route(){
   if(({employes:1,valider:1,activite:1,commandes:1})[r]&&st.mode!=='paid'){render(vLock('adv'),r);return;}
   if(({depense:1,saisie:1,vente:1,bande:1,oeufs:1})[r]&&st.mode==='expired'){render(vLock('ro'),r);return;}
   if(!db.bandes.length&&r!=='bande'){location.replace('#/bande/new');return;}
-  var views={accueil:vHome,depenses:vDep,depense:function(){return vDepForm(arg);},stock:vStock,saisie:vSaisie,ventes:vVentes,vente:function(){return vVenteForm(arg);},bandes:vBandes,bande:vBandeForm,valider:vValider,employes:vEmployes,commandes:vCommandes,clients:vClients,kuro:vKuro,activite:vActivite,bilan:function(){return vBilan(arg);},oeufs:vOeufs,reglages:vReglages,dettes:vDettes,climat:vClimat,simulateur:vSim,rappels:function(){return vRappels(arg);},carnet:vCarnet,abo:vAbo};
+  var views={accueil:vHome,depenses:vDep,depense:function(){return vDepForm(arg);},stock:vStock,saisie:vSaisie,ventes:vVentes,vente:function(){return vVenteForm(arg);},bandes:vBandes,bande:vBandeForm,valider:vValider,employes:vEmployes,commandes:vCommandes,clients:vClients,activite:vActivite,bilan:function(){return vBilan(arg);},oeufs:vOeufs,reglages:vReglages,dettes:vDettes,climat:vClimat,simulateur:vSim,rappels:function(){return vRappels(arg);},carnet:vCarnet,abo:vAbo};
   render((views[r]||vHome)(),r);
 }
 app.addEventListener('click',function(e){
@@ -2429,7 +2443,7 @@ function bindStat(){
 /* ---------- Centre : mises à jour + comptage des appareils ---------- */
 var CENTER={proj:'poulebox',key:'AIzaSyDaAkRRkGchPMrBw6oVKb4fhSFb2qptuWM'};
 function cenOn(){return !!(CENTER.proj&&CENTER.key);}
-var WEBVER='3.16.1 web';
+var WEBVER='3.17.1 web';
 function isWeb(){return !(window.AndroidBridge&&window.AndroidBridge.appInfo);}
 function appInfo(){if(isWeb()){return {name:WEBVER,code:999999};}try{var s=window.AndroidBridge&&window.AndroidBridge.appInfo&&window.AndroidBridge.appInfo();if(s){var a=String(s).split('|');return {name:a[0],code:parseInt(a[1],10)||0};}}catch(e){}return null;}
 function devId(){if(isWeb()){return normDev(getDev());}try{return String((window.AndroidBridge&&window.AndroidBridge.deviceId&&window.AndroidBridge.deviceId())||'').replace(/[^A-Z0-9]/g,'');}catch(e){return '';}}
