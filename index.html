@@ -724,7 +724,7 @@ function vOeufs(){
 /* ---------- Bandes ---------- */
 function vBandes(){
   curBande();
-  var html='<div class="screen"><div class="top"><h1>Vagues</h1></div><a class="btn" href="#/bande/new">+ Nouvelle vague</a>'+
+  var html='<div class="screen"><div class="top"><h1>Vagues</h1></div><a class="btn" href="#/bande/new">+ Nouvelle vague</a><a class="btn alt" href="#/kuro">🐓 Kuroiler : œufs fécondés et couvée</a>'+
   db.bandes.slice().reverse().map(function(b){var s=stats(b);
     return '<div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><div class="h2" style="margin:0">'+esc(b.nom)+'</div>'+(b.id===db.cur?'<span class="tag" style="background:var(--greenBg);color:var(--greenDk)">Vague affichée</span>':'')+'</div>'+
     '<div class="sm" style="margin:6px 0 10px">'+(isP(b)?'🥚 Ponte · ':'')+'Arrivée le '+fd(b.date)+'/'+b.date.slice(0,4)+' · '+b.nb+(isP(b)?' pondeuses':' poussins')+' · jour '+dayN(b)+(b.fin?' · terminée':'')+'</div>'+
@@ -735,7 +735,7 @@ function vBandes(){
 function vBandeForm(){
   var first=!db.bandes.length;
   var html='<div class="screen">'+(first?'<div class="welcome"><div class="logo" data-vtap="1">'+LOGO+'</div><h1>Bienvenue dans Mon Poulailler</h1><p>Gérez vos poulets de chair et vos pondeuses : dépenses, stock, mortalité, ponte et ventes.</p></div>'+((cfg.pfirst&&Date.now()-cfg.pfirst>18*36e5)?'<div class="box yelbox" style="margin-bottom:12px"><b>Bon retour !</b><div class="sm" style="color:var(--yelDk)">Remplissez les deux cases ci-dessous et touchez « Commencer » : votre première vague est prête en 1 minute.</div></div>':''):'<div class="ttl"><a class="back" href="#/bandes" aria-label="Retour">‹</a><h1>Nouvelle vague</h1></div>')+
-  '<form id="f" onsubmit="return false"><div class="fld"><div class="l">Type d\'élevage</div>'+chips('typ',['Poulets de chair','Pondeuses'],'Poulets de chair')+'</div><div class="fld"><label class="l" for="f_nom">Nom de la vague</label><input class="in" id="f_nom" type="text" value="Vague '+(db.bandes.length+1)+'"></div>'+
+  '<form id="f" onsubmit="return false"><div class="fld"><div class="l">Type d\'élevage</div>'+chips('typ',['Poulets de chair','Pondeuses','Kuroiler'],'Poulets de chair')+'</div><div class="fld"><label class="l" for="f_nom">Nom de la vague</label><input class="in" id="f_nom" type="text" value="Vague '+(db.bandes.length+1)+'"></div>'+
   '<div class="row fld"><div><label class="l" for="f_date" id="l_date">Date d\'arrivée des poussins</label><input class="in" id="f_date" type="date" value="'+todayISO()+'"></div><div><label class="l" for="f_nb" id="l_nb">Nombre de poussins</label><input class="in" id="f_nb" type="text" inputmode="numeric" placeholder="ex. : 500"></div></div>'+
   '<div class="fld"><label class="l" for="f_pu" id="l_pu">Prix d\'un poussin en FCFA (facultatif)</label><input class="in" id="f_pu" type="text" inputmode="decimal" placeholder="ex. : 900"><div class="sm" style="margin-top:6px" id="l_pn">Si vous le remplissez, l\'achat des poussins est ajouté aux dépenses.</div></div>'+
   '<div class="fld" id="w_age" style="display:none"><label class="l" for="f_age">Âge à l\'arrivée en semaines (facultatif)</label><input class="in" id="f_age" type="text" inputmode="numeric" placeholder="ex. : 18 (pondeuses prêtes à pondre)"></div>'+
@@ -745,7 +745,7 @@ function vBandeForm(){
   (first?'<button class="btn alt" type="button" data-role="worker" style="height:60px;font-size:17px;margin-top:16px">👷 Je suis gérant (j\'ai un code)</button>'+iosHint()+'<div class="sm" style="text-align:center;margin-top:10px">Un identifiant anonyme du téléphone et la version de l\'application sont envoyés une fois par jour pour compter les utilisateurs. Aucune donnée d\'élevage n\'est envoyée.</div>':'')+'</div>';
   return {html:html,theme:'t-green',init:function(){
     var tp=function(){return chipVal('typ')==='Pondeuses';};
-    hooks.chip=function(g){if(g!=='typ'){return;}var p=tp();
+    hooks.chip=function(g){if(g!=='typ'){return;}if(chipVal('typ')==='Kuroiler'){location.hash='#/kuro';return;}var p=tp();
       $('#l_date').textContent=p?'Date d\'arrivée des pondeuses':'Date d\'arrivée des poussins';$('#l_nb').textContent=p?'Nombre de pondeuses':'Nombre de poussins';
       $('#l_pu').textContent=p?'Prix d\'une pondeuse en FCFA (facultatif)':'Prix d\'un poussin en FCFA (facultatif)';$('#l_pn').textContent=p?'Si vous le remplissez, l\'achat des pondeuses est ajouté aux dépenses.':'Si vous le remplissez, l\'achat des poussins est ajouté aux dépenses.';
       $('#w_age').style.display=p?'':'none';};
@@ -2429,7 +2429,7 @@ function bindStat(){
 /* ---------- Centre : mises à jour + comptage des appareils ---------- */
 var CENTER={proj:'poulebox',key:'AIzaSyDaAkRRkGchPMrBw6oVKb4fhSFb2qptuWM'};
 function cenOn(){return !!(CENTER.proj&&CENTER.key);}
-var WEBVER='3.16.0 web';
+var WEBVER='3.16.1 web';
 function isWeb(){return !(window.AndroidBridge&&window.AndroidBridge.appInfo);}
 function appInfo(){if(isWeb()){return {name:WEBVER,code:999999};}try{var s=window.AndroidBridge&&window.AndroidBridge.appInfo&&window.AndroidBridge.appInfo();if(s){var a=String(s).split('|');return {name:a[0],code:parseInt(a[1],10)||0};}}catch(e){}return null;}
 function devId(){if(isWeb()){return normDev(getDev());}try{return String((window.AndroidBridge&&window.AndroidBridge.deviceId&&window.AndroidBridge.deviceId())||'').replace(/[^A-Z0-9]/g,'');}catch(e){return '';}}
