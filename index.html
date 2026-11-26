@@ -186,15 +186,27 @@ function xClean(n){return String(n||'').replace(/\s*\[(Plumage|Livraison|Frigo)\
 function xMod(n){var m=/\[Modif:([A-Z2-9]{8})\]/.exec(String(n||''));return m?m[1]:'';}
 function xNoMod(n){return String(n||'').replace(/\s*\[Modif:[A-Z2-9]{8}\]/g,'').trim();}
 function cKey(n){return String(n||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'');}
-function clientTouch(nom,tel){nom=String(nom||'').trim();if(cKey(nom).length<2){return;}db.clients=db.clients||{};var k=cKey(nom),c=db.clients[k]||{nom:nom.slice(0,60),tel:''};c.nom=nom.slice(0,60);if(tel){c.tel=String(tel).slice(0,30);}db.clients[k]=c;}
+function telD(t){return String(t||'').replace(/\D/g,'');}
+function cId(nom,tel){var d=telD(tel);return cKey(nom)+(d?'#'+d:'');}
+function clientTouch(nom,tel){nom=String(nom||'').trim();if(cKey(nom).length<2){return;}db.clients=db.clients||{};
+  var base=cKey(nom),k=cId(nom,tel),c=db.clients[k];
+  if(!c&&tel&&db.clients[base]&&!db.clients[base].tel){c=db.clients[base];delete db.clients[base];}
+  c=c||{nom:nom.slice(0,60),tel:''};c.nom=nom.slice(0,60);if(tel){c.tel=String(tel).slice(0,30);}db.clients[k]=c;}
 function clientList(){
-  var m={};function get(nm){var k=cKey(nm);if(k.length<2){return null;}return m[k]||(m[k]={k:k,nom:String(nm).trim(),tel:'',n:0,qty:0,tot:0,last:''});}
-  Object.keys(db.clients||{}).forEach(function(k){var c=db.clients[k],x=get(c.nom);if(x&&c.tel){x.tel=c.tel;}});
-  db.ventes.forEach(function(v){var c=get(v.client);if(!c){return;}c.n++;if(v.prod!=='oeuf'){c.qty+=v.qty;}c.tot+=v.total;if((v.date||'')>c.last){c.last=v.date;}});
-  db.commandes.forEach(function(v){var c=get(v.client);if(!c){return;}c.n++;c.qty+=v.qty;c.tot+=v.total;if(v.tel){c.tel=v.tel;}if((v.date||'')>c.last){c.last=v.date;}});
+  var m={};
+  function get(nm,tel){var base=cKey(nm);if(base.length<2){return null;}
+    if(telD(tel)){var k=cId(nm,tel);return m[k]||(m[k]={k:k,nom:String(nm).trim(),tel:String(tel).trim(),n:0,qty:0,tot:0,last:''});}
+    var same=Object.keys(m).filter(function(q){return q.split('#')[0]===base;});
+    if(same.length===1){return m[same[0]];}
+    if(same.length>1){var nt=m[base];if(nt){return nt;}}
+    return m[base]||(m[base]={k:base,nom:String(nm).trim(),tel:'',n:0,qty:0,tot:0,last:''});}
+  Object.keys(db.clients||{}).forEach(function(k){var c=db.clients[k],x=get(c.nom,c.tel);if(x&&c.tel){x.tel=c.tel;}});
+  db.ventes.forEach(function(v){var c=get(v.client,v.tel);if(!c){return;}c.n++;if(v.prod!=='oeuf'){c.qty+=v.qty;}c.tot+=v.total;if((v.date||'')>c.last){c.last=v.date;}});
+  db.commandes.forEach(function(v){var c=get(v.client,v.tel);if(!c){return;}c.n++;c.qty+=v.qty;c.tot+=v.total;if(v.tel){c.tel=v.tel;}if((v.date||'')>c.last){c.last=v.date;}});
   return Object.keys(m).map(function(k){return m[k];}).sort(function(a,b){return b.tot-a.tot;});
 }
 function fidel(n){return n>=5?'⭐ Fidèle':(n>=2?'Régulier':'Nouveau');}
+function telNote(nom){var base=cKey(nom);return clientList().filter(function(x){return cKey(x.nom)===base&&x.tel;});}
 function clDatalist(arr){return '<datalist id="cl_list">'+arr.slice(0,300).map(function(x){return '<option value="'+esc(x)+'">';}).join('')+'</datalist>';}
 /* clients du gérant (liste locale créée automatiquement) */
 function wClients(){
@@ -632,7 +644,7 @@ function vVentes(){
   '<a class="btn alt" href="#/bilan">Voir le bilan complet</a>'+
   '<a class="btn alt" href="#/clients">Mes clients ('+clientList().length+')</a>'+
   '<a class="btn alt" href="#/commandes">Commandes en attente ('+db.commandes.filter(function(c){return c.b===b.id;}).length+')</a>'+
-  (list.length?list.map(function(x){var reste=Math.max(0,x.total-x.recu);return '<a class="item" href="#/vente/'+x.id+'"><div class="main"><div class="t">'+esc(x.client||'Client')+'</div><div class="d">'+x.qty+(x.prod==='oeuf'?' plateaux':(x.prod==='reforme'?' poules':' poulets'))+' × '+fmt(x.pu)+(x.who?' · par '+esc(x.who):'')+'</div></div><div class="r"><div class="v">'+fmt(x.total)+'</div><div class="d">'+fd(x.date)+'</div>'+(reste>0?'<span class="tag">À encaisser '+fmt(reste)+'</span>':'')+'</div></a>';}).join(''):'<div class="empty">Aucune vente pour le moment.</div>')+'</div>';
+  (list.length?list.map(function(x){var reste=Math.max(0,x.total-x.recu);return '<a class="item" href="#/vente/'+x.id+'"><div class="main"><div class="t">'+esc(x.client||'Client')+(x.tel?' <span class="sm">· '+esc(x.tel)+'</span>':'')+'</div><div class="d">'+x.qty+(x.prod==='oeuf'?' plateaux':(x.prod==='reforme'?' poules':' poulets'))+' × '+fmt(x.pu)+(x.who?' · par '+esc(x.who):'')+'</div></div><div class="r"><div class="v">'+fmt(x.total)+'</div><div class="d">'+fd(x.date)+'</div>'+(reste>0?'<span class="tag">À encaisser '+fmt(reste)+'</span>':'')+'</div></a>';}).join(''):'<div class="empty">Aucune vente pour le moment.</div>')+'</div>';
   return {html:html,theme:'t-green',init:function(){bindBsel();bindPrix();}};
 }
 function vVenteForm(id){
@@ -648,6 +660,7 @@ function vVenteForm(id){
   '<div class="row fld"><div><label class="l" for="f_date">Date</label><input class="in" id="f_date" type="date" value="'+esc(d.date)+'"></div><div><div class="l">Vague</div><div class="in" style="display:flex;align-items:center">'+esc(b.nom)+'</div></div></div>'+
   (cm?'<div class="box" style="margin-bottom:14px">Acompte déjà reçu : <b>'+fmt(cm.recu)+' FCFA</b> · Total convenu : <b>'+fmt(cm.total)+' FCFA</b><div class="sm" style="color:var(--pDk)">Indiquez le montant total reçu (acompte + solde). Vide = payé en totalité.</div></div>':'')+
   '<div class="fld"><label class="l" for="f_client">Client</label><input class="in" id="f_client" type="text" list="cl_list" autocomplete="off" value="'+esc(d.client)+'" placeholder="Nom du client">'+clDatalist(clientList().map(function(x){return x.nom;}))+'</div>'+
+  '<div class="fld"><label class="l" for="f_ctel">Téléphone du client (pour ne pas confondre deux clients du même nom)</label><input class="in" id="f_ctel" type="text" inputmode="tel" autocomplete="off" placeholder="ex. : 76 00 00 00" value="'+esc(d.tel||(cm&&cm.tel)||'')+'"><div id="f_ctl" style="margin-top:6px"></div></div>'+
   '<div class="row"><div><label class="l" for="f_qty">'+W.q+'</label><input class="in" id="f_qty" type="text" inputmode="numeric" value="'+esc(d.qty)+'"></div><div><label class="l" for="f_pu">'+W.p+'</label><input class="in" id="f_pu" type="text" inputmode="decimal" value="'+esc(d.pu)+'"></div></div>'+
   '<div class="sm fld" style="margin-top:6px">'+(prod==='oeuf'?'Stock d\'œufs après cette vente : ':(prod==='reforme'?'Poules restantes après cette vente : ':'Poulets restants après cette vente : '))+'<b id="f_left">'+(prod==='oeuf'?plat(avail):avail)+'</b></div>'+
   '<div class="fld"'+(prod==='oeuf'?' style="display:none"':'')+'><label class="l" for="f_poids">Poids total en kg (facultatif)</label><input class="in" id="f_poids" type="text" inputmode="decimal" value="'+esc(d.poids)+'" placeholder="ex. : 380"></div>'+
@@ -667,14 +680,18 @@ function vVenteForm(id){
       return {q:q,t:t,recu:recu,av:av,X:X};
     };
     $('#f').addEventListener('input',calc);$('#f').addEventListener('change',calc);hooks.chip=calc;calc();
+    var ci=$('#f_client'),ctl=$('#f_ctel'),ctx=$('#f_ctl');
+    function ctSug(){var L=telNote(ci.value);ctx.innerHTML=(L.length>1?'<div class="sm mort" style="margin-bottom:4px">Plusieurs clients portent ce nom : touchez le bon numéro.</div>':'')+L.map(function(x){return '<button class="chip sm" type="button" data-ct="'+esc(x.tel)+'">📞 '+esc(x.tel)+'</button>';}).join(' ');ctx.querySelectorAll('[data-ct]').forEach(function(bt){bt.onclick=function(){ctl.value=bt.dataset.ct;};});}
+    ci.addEventListener('input',ctSug);ci.addEventListener('change',ctSug);ctSug();
     $('#save').onclick=function(){
       var c=calc();
       if(!(c.q>0)){toast(prod==='oeuf'?'Saisissez le nombre de plateaux':'Saisissez le nombre de '+(prod==='reforme'?'poules':'poulets'));return;}
       if(prod==='oeuf'){if(c.q*30>avail&&!confirm('Votre stock d\'œufs enregistré est de '+plat(avail)+'. Enregistrer quand même cette vente ?')){return;}}
       else if(c.q>c.av){toast(c.X.fr?'Il ne reste que '+c.av+' sujet(s) égorgé(s) au frigo':'Il ne reste que '+c.av+(prod==='reforme'?' poules vivantes':' poulets vivants'));return;}
       var v={id:o?o.id:uid(),ts:o?o.ts:Date.now(),b:b.id,who:(o?o.who:(cm?cm.who:''))||'',date:$('#f_date').value||todayISO(),client:$('#f_client').value.trim(),qty:c.q,pu:num($('#f_pu').value),total:c.t,poids:prod==='oeuf'?'':(num($('#f_poids').value)||''),pay:chipVal('pay'),recu:c.recu,note:prod==='oeuf'?$('#f_note').value.trim():xNote($('#f_note').value,c.X.pl,c.X.lv,c.X.fr)};
+      var ct=($('#f_ctel').value||'').trim().slice(0,30);if(ct){v.tel=ct;}
       if(prod!=='poulet'){v.prod=prod;}else if(o&&o.prod){v.prod=o.prod;}
-      if(o){db.ventes[db.ventes.indexOf(o)]=v;}else{db.ventes.push(v);}clientTouch(v.client,cm?cm.tel:'');
+      if(o){db.ventes[db.ventes.indexOf(o)]=v;}else{db.ventes.push(v);}clientTouch(v.client,v.tel||(cm?cm.tel:''));
       if(cm){db.commandes=db.commandes.filter(function(x){return x!==cm;});pubOrder(cm,'done');}
       save();toast('Vente enregistrée');
       if(!o&&v.client&&confirm('Vente enregistrée. Envoyer un reçu au client ?')){location.hash='#/recu/'+v.id;}else{location.hash='#/ventes';}
@@ -831,6 +848,7 @@ function cleanReport(x){
   if(o.type==='mort'){o.n=Math.max(0,Math.floor(num(x.n)));o.cause=CAUSES.indexOf(x.cause)>=0?x.cause:'Inconnue';}
   else if(o.type==='oeuf'){o.n=Math.max(0,Math.floor(num(x.n)));o.casses=Math.min(o.n,Math.max(0,Math.floor(num(x.casses))));}
   else{if(x.prod==='oeuf'){o.prod='oeuf';}o.client=String(x.client||'').slice(0,60);o.qty=Math.max(0,Math.floor(num(x.qty)));o.pu=Math.max(0,num(x.pu));o.recu=Math.max(0,num(x.recu));o.pay=PAYS.indexOf(x.pay)>=0?x.pay:'Espèces';
+    if(o.type==='vente'&&x.tel){o.tel=String(x.tel).slice(0,30);}
     if(o.type==='commande'){o.tel=String(x.tel||'').slice(0,30);o.livr=/^\d{4}-\d\d-\d\d$/.test(String(x.livr))?String(x.livr):'';
       if(o.who==='Client en ligne'&&cfg.role==='owner'&&db.prix&&db.prix.v>0){o.pu=db.prix.v;}}}
   return o;
@@ -885,9 +903,10 @@ function validateReport(id,ok){
       var mc=/COMMANDE ([A-Z2-9]{4})-?([A-Z2-9]{4})/i.exec(p.note||''),cmo=null;
       if(mc){var cc=(mc[1]+mc[2]).toUpperCase();cmo=db.commandes.filter(function(x){return orderCode(x)===cc;})[0]||null;
         if(!cmo&&!confirm('Cette commande n\'est plus en attente (déjà livrée ou annulée). Valider quand même cette vente ?')){return;}}
-      clientTouch(p.client,'');
+      clientTouch(p.client,p.tel||'');
       var nv={id:'r'+id,ts:Date.now(),b:b.id,date:p.date,client:p.client,qty:p.qty,pu:p.pu,total:xTot(p.qty,p.pu,p.note),poids:'',pay:p.pay,recu:recu,decl:Math.max(0,Math.round(+p.recu||0)),who:p.who,note:p.note||''};
       if(egg){nv.prod='oeuf';}
+      if(p.tel){nv.tel=String(p.tel).slice(0,30);}
       db.ventes.push(nv);
       if(cmo){db.commandes=db.commandes.filter(function(x){return x!==cmo;});pubOrder(cmo,'done');}
     }
@@ -1074,13 +1093,14 @@ function vClients(){
   '<div class="card"><div class="row"><div><div class="sm">Clients</div><div class="big">'+L.length+'</div></div><div><div class="sm">Clients fidèles (5 achats et plus)</div><div class="big">'+fid+'</div></div></div>'+
   '<div class="sm" style="margin-top:8px">La liste se remplit toute seule à chaque vente et chaque commande. Rien à saisir.</div></div>'+
   (L.length?'<div class="fld"><input class="in" id="c_q" type="text" placeholder="Chercher un client…" autocomplete="off"></div>':'')+
-  (L.length?L.map(function(x){return '<div class="card cl" data-s="'+esc(cKey(x.nom)+' '+String(x.tel).replace(/\D/g,''))+'"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><b>'+esc(x.nom)+'</b><span class="tag" style="background:'+(x.n>=5?'var(--yelBg,#FFF6DC);color:var(--yelDk,#8a5a00)':'var(--greenBg);color:var(--greenDk)')+'">'+fidel(x.n)+'</span></div>'+
+  (L.length?L.map(function(x){return '<div class="card cl" data-s="'+esc(cKey(x.nom)+' '+String(x.tel).replace(/\D/g,''))+'"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><b>'+esc(x.nom)+(x.tel?' <span class="sm">· '+esc(x.tel)+'</span>':'')+'</b><span class="tag" style="background:'+(x.n>=5?'var(--yelBg,#FFF6DC);color:var(--yelDk,#8a5a00)':'var(--greenBg);color:var(--greenDk)')+'">'+fidel(x.n)+'</span></div>'+
     '<div class="sm" style="margin-top:4px">'+x.n+' achat'+(x.n>1?'s':'')+' · '+x.qty+' poulet'+(x.qty>1?'s':'')+' · <b>'+fmt(x.tot)+' FCFA</b>'+(x.last?' · dernier : '+fd(x.last):'')+'</div>'+
     (x.tel?'<div class="sm" style="margin-top:2px">Tél. '+esc(x.tel)+'</div><div class="row" style="margin-top:8px"><button class="btn alt sm" type="button" data-cwa="'+esc(x.tel)+'">WhatsApp</button><a class="btn alt sm" href="tel:'+esc(String(x.tel).replace(/[^\d+]/g,''))+'">Appeler</a></div>':'')+'</div>';}).join(''):'<div class="box">Aucun client pour le moment. Dès votre première vente ou commande, la liste se crée.</div>')+'</div>';
   return {html:html,theme:'t-green',init:function(){var q=$('#c_q');if(q){q.addEventListener('input',function(){var v=cKey(q.value);app.querySelectorAll('.cl').forEach(function(e){e.hidden=v&&e.dataset.s.indexOf(v)<0;});});}
     app.querySelectorAll('[data-cwa]').forEach(function(bn){bn.onclick=function(){waOpen(bn.dataset.cwa,'Bonjour, ');};});}};
 }
 function vCommandes(){
+  var others=db.bandes.filter(function(x){return x.id!==curBande().id&&!isK(x)&&!isP(x)&&!x.fin;});
   var b=curBande();
   var list=db.commandes.filter(function(c){return c.b===b.id;}).sort(function(a,c){return (a.livr||'9999').localeCompare(c.livr||'9999');});
   var tq=sum(list,'qty'),ta=sum(list,'recu'),tt=sum(list,'total'),s=stats(b);
@@ -1094,8 +1114,15 @@ function vCommandes(){
     '<div class="box" style="margin:10px 0"><b>'+c.qty+' poulet'+(c.qty>1?'s':'')+' × '+fmt(c.pu)+xLine(c.qty,c.note)+' = '+fmt(c.total)+' FCFA</b><br><span class="sm">'+(c.recu>0?'Acompte reçu : '+fmt(c.recu)+' · reste '+fmt(reste):'Aucun argent reçu · reste '+fmt(reste))+'</span>'+(c.who?'<br><span class="sm">Prise par '+esc(c.who)+'</span>':'')+(xClean(c.note)?'<br><span class="sm">'+esc(xClean(c.note))+'</span>':'')+'</div>'+
     '<div class="box" style="margin:0 0 10px;background:#FFF6DC;text-align:center"><span class="sm">Code de commande</span><div style="font-size:24px;font-weight:800;letter-spacing:.1em">'+ocodeFmt(orderCode(c))+'</div></div>'+
     '<a class="btn alt sm" href="#/recu/c_'+esc(c.id)+'" style="margin-bottom:8px">Code et reçu pour le client</a>'+
+    (others.length?'<div class="fld" style="margin:0 0 10px"><label class="l" for="mv_'+esc(c.id)+'">Cette commande doit sortir d\'une autre vague ?</label><div class="row"><select class="in sel" id="mv_'+esc(c.id)+'">'+others.map(function(o){return '<option value="'+o.id+'">'+esc(o.nom)+' · '+sum(db.commandes.filter(function(x){return x.b===o.id;}),'qty')+' réservés</option>';}).join('')+'</select><button class="btn alt sm" type="button" data-cmdmv="'+esc(c.id)+'">Déplacer</button></div></div>':'')+
     '<div class="row"><a class="btn sm" href="#/vente/c_'+esc(c.id)+'">Livrer</a><button class="btn danger sm" type="button" data-cmdno="'+esc(c.id)+'">Annuler</button></div></div>';}).join(''):'<div class="empty">Aucune commande en attente.</div>')+'</div>';
-  return {html:html,theme:'t-green'};
+  return {html:html,theme:'t-green',init:function(){
+    app.querySelectorAll('[data-cmdmv]').forEach(function(bt){bt.onclick=function(){
+      var c=db.commandes.filter(function(x){return String(x.id)===bt.dataset.cmdmv;})[0],sel=$('#mv_'+bt.dataset.cmdmv),tb=db.bandes.filter(function(x){return sel&&x.id===sel.value;})[0];
+      if(!c||!tb){return;}
+      if(confirm('Déplacer la commande de '+(c.client||'ce client')+' ('+c.qty+' poulets) vers « '+tb.nom+' » ?')){c.b=tb.id;db.cur=tb.id;save();toast('Commande déplacée vers '+tb.nom);route();}
+    };});
+  }};
 }
 function pendingQ(){return cfg.queue.filter(function(x){return !x.sent;});}
 function queueReport(data){
@@ -1223,6 +1250,7 @@ function vWVente(prod){
   (FO?'<div class="box" style="margin-bottom:14px"><b>Commande '+ocodeFmt(FO.code)+'</b><div class="sm" style="color:var(--pDk)">Total convenu : '+fmt(FO.o.tot)+' FCFA · acompte déjà reçu : '+fmt(FO.o.recu||0)+' FCFA · <b>reste à encaisser : '+fmt(Math.max(0,FO.o.tot-(FO.o.recu||0)))+' FCFA</b><br>Dans « Montant reçu », indiquez le total reçu (acompte + reste). Vide = payé en totalité.</div></div>':'')+
   '<div class="fld"><label class="l" for="f_date">Date</label><input class="in" id="f_date" type="date" value="'+todayISO()+'"></div>'+
   '<div class="fld"><label class="l" for="f_client">Client</label><input class="in" id="f_client" type="text" list="cl_list" autocomplete="off" placeholder="Nom du client" value="'+(FO?esc(FO.o.cl||''):'')+'">'+clDatalist(wClients().map(function(x){return x.nom;}))+'<div class="sm" id="f_cfid" style="margin-top:4px;color:var(--pDk);font-weight:600"></div></div>'+
+  '<div class="fld"><label class="l" for="f_ctel">Téléphone du client (facultatif)</label><input class="in" id="f_ctel" type="text" inputmode="tel" autocomplete="off" placeholder="ex. : 76 00 00 00"></div>'+
   '<div class="row fld"><div><label class="l" for="f_qty">'+(E?'Nombre de plateaux (30 œufs)':'Nombre de poulets')+'</label><input class="in" id="f_qty" type="text" inputmode="numeric" value="'+(FO?FO.o.qty:'')+'"></div>'+(E?'<div><label class="l" for="f_pu">Prix par plateau</label><input class="in" id="f_pu" type="text" inputmode="decimal" placeholder="FCFA"></div>':(FO?'<div><label class="l" for="f_pu">Prix par poulet</label><input class="in" id="f_pu" type="text" value="'+FO.o.pu+'" readonly></div>':wPrixField()))+'</div><div class="sm" id="f_pxn" style="margin:-6px 0 12px"></div>'+
   (E?'':xBlock(FO?FO.o.note:'',!FO))+'<div class="box" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><b>Total de la vente</b><span class="big" style="color:var(--pDk)"><span id="f_total">0</span> <small>FCFA</small></span></div>'+
   '<div class="fld"><div class="l">Mode de paiement</div>'+chips('pay',PAYS,'Espèces')+'</div>'+
@@ -1237,7 +1265,7 @@ function vWVente(prod){
       if(!(c.q>0)){toast(E?'Saisissez le nombre de plateaux':'Saisissez le nombre de poulets');return;}
       if(!(pu>0)){toast(E?'Saisissez le prix du plateau':'Prix du jour non reçu : connectez-vous à internet puis réessayez');return;}
       var rv=$('#f_recu').value.trim(),pay=chipVal('pay'),recu=rv===''?(pay==='À crédit'?0:c.t):Math.round(num(rv));
-      var rp={type:'vente',date:$('#f_date').value||todayISO(),client:$('#f_client').value.trim().slice(0,60),qty:c.q,pu:pu,recu:recu,pay:pay,note:E?$('#f_note').value.trim().slice(0,200):xNote(FO?('Commande '+ocodeFmt(FO.code)+($('#f_note').value.trim()?' · '+$('#f_note').value.trim():'')):$('#f_note').value,c.X.pl,c.X.lv,c.X.fr)};
+      var rp={type:'vente',date:$('#f_date').value||todayISO(),client:$('#f_client').value.trim().slice(0,60),tel:($('#f_ctel')?$('#f_ctel').value.trim().slice(0,30):''),qty:c.q,pu:pu,recu:recu,pay:pay,note:E?$('#f_note').value.trim().slice(0,200):xNote(FO?('Commande '+ocodeFmt(FO.code)+($('#f_note').value.trim()?' · '+$('#f_note').value.trim():'')):$('#f_note').value,c.X.pl,c.X.lv,c.X.fr)};
       if(E){rp.prod='oeuf';}
       queueReport(rp);if(FO){cfg.sentCodes=cfg.sentCodes||{};cfg.sentCodes[FO.code]=Date.now();saveCfg();finOrder=null;}
       toast('Enregistré, envoi en cours…');location.hash='#/accueil';
@@ -1461,6 +1489,20 @@ async function wxFetch(city){
   var j=await r.json();
   return {city:p.name,now:j.current.temperature_2m,max:j.daily.temperature_2m_max[0],min:j.daily.temperature_2m_min[0],ts:Date.now()};
 }
+function geoGet(){return new Promise(function(res,rej){
+  if(!navigator.geolocation){rej(new Error('Position non disponible sur ce téléphone'));return;}
+  navigator.geolocation.getCurrentPosition(function(p){res(p.coords);},function(e){rej(new Error(e&&e.code===1?'Position refusée. Autorisez la position pour Mon Poulailler dans les réglages du téléphone, ou entrez votre ville.':'Position introuvable. Réessayez dehors ou entrez votre ville.'));},{timeout:20000,maximumAge:1800000,enableHighAccuracy:false});});}
+async function wxFetchPos(lat,lon){
+  var r=await fetchT('https://api.open-meteo.com/v1/forecast?latitude='+lat+'&longitude='+lon+'&current=temperature_2m&daily=temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=1',{},12000);
+  var j=await r.json(),name='Ma position';
+  try{var g=await fetchT('https://api.bigdatacloud.net/data/reverse-geocode-client?latitude='+lat+'&longitude='+lon+'&localityLanguage=fr',{},6000),gj=await g.json();name=gj.city||gj.locality||gj.principalSubdivision||name;}catch(e){}
+  return {city:name,now:j.current.temperature_2m,max:j.daily.temperature_2m_max[0],min:j.daily.temperature_2m_min[0],ts:Date.now(),auto:1};
+}
+async function wxAuto(force){
+  if(cfg.wxAuto===false){return false;}
+  if(!force&&cfg.wx&&cfg.wx.auto&&Date.now()-cfg.wx.ts<3*3600e3){return true;}
+  try{var c=await geoGet();cfg.wx=await wxFetchPos(c.latitude,c.longitude);cfg.wxAuto=true;saveCfg();return true;}catch(e){return e;}
+}
 function climCard(){
   var b=curBande();if(!b||b.fin){return '';}
   var d=dayN(b),i=idealT(d),w=cfg.wx,h='';
@@ -1473,7 +1515,7 @@ function vClimat(){
   var tab=rows.map(function(r){var on=(d<=r[0]&&(r[0]===7||d>rows[rows.indexOf(r)-1][0]));return `<div class="line"${on?' style="font-weight:700;color:var(--green)"':''}><span>Jours ${r[1]}</span><span>${r[2]} °C</span></div>`;}).join('');
   var html=`<div class="screen"><div class="ttl"><a class="back" href="#/accueil" aria-label="Retour">‹</a><h1>Température</h1></div>
   <div class="card"><div class="h2">Aujourd'hui : jour ${d}</div><div class="big">${i.lo}-${i.hi} <small>°C idéal</small></div></div>
-  <div class="card"><div class="h2">Météo de ma ville</div><div class="fld"><input class="in" id="wx_c" type="text" placeholder="Ex. : Bamako" value="${esc((cfg.wx&&cfg.wx.city)||cfg.city||'')}"></div>
+  <div class="card"><div class="h2">Météo de ma ville</div><button class="btn" type="button" id="wx_p" style="margin-bottom:10px">📍 Utiliser ma position (automatique)</button><div class="sm" style="margin-bottom:8px">La météo se met à jour toute seule. Vous pouvez aussi entrer une ville :</div><div class="fld"><input class="in" id="wx_c" type="text" placeholder="Ex. : Bamako" value="${esc((cfg.wx&&cfg.wx.city)||cfg.city||'')}"></div>
   <button class="btn sm" type="button" id="wx_b">Voir la météo</button><div id="wx_r" class="sm" style="margin-top:10px">${cfg.wx?'':'Entrez votre ville (internet nécessaire).'}</div></div>
   <div class="card"><div class="h2">Température dans mon poulailler</div><div class="fld"><input class="in" id="wx_t" type="text" inputmode="decimal" placeholder="Lue sur le thermomètre, ex. 31"></div><div id="wx_a" class="sm"></div></div>
   <div class="card"><div class="h2">Repères selon l'âge</div>${tab}</div></div>`;
@@ -1484,10 +1526,17 @@ function vClimat(){
       el.innerHTML=`${esc(w.city)} : maintenant <b>${Math.round(w.now)}°C</b> · max <b>${Math.round(w.max)}°C</b> · min <b>${Math.round(w.min)}°C</b><div class="box ${a.c==='red'?'redbox':''}" style="margin-top:8px">Journée chaude : ${esc(climAdvice(d,w.max).m)}</div><div class="box" style="margin-top:8px">Nuit : ${esc(climAdvice(d,w.min).m)}</div><div class="sm" style="margin-top:6px">La météo donne l'air extérieur. Dans un poulailler fermé, il fait plus chaud : mesurez aussi à l'intérieur.</div>`;
     }
     show();
+    var gp=async function(force){
+      $('#wx_r').textContent='Recherche de votre position…';
+      var r=await wxAuto(force);
+      if(r===true){show();}else{$('#wx_r').textContent=(r&&r.message)||'Position introuvable';if(cfg.wx){show();$('#wx_r').insertAdjacentHTML('afterbegin','<div class="sm mort">'+esc((r&&r.message)||'')+'</div>');}}
+    };
+    $('#wx_p').onclick=function(){cfg.wxAuto=true;gp(true);};
+    if(cfg.wxAuto!==false&&(!cfg.wx||!cfg.wx.auto||Date.now()-cfg.wx.ts>3*3600e3)){gp(false);}
     $('#wx_b').onclick=async function(){
       var c=$('#wx_c').value.trim();if(!c){toast('Entrez une ville');return;}
       $('#wx_r').textContent='Chargement…';
-      try{cfg.wx=await wxFetch(c);cfg.city=c;saveCfg();show();}catch(e){$('#wx_r').textContent=errMsg(e);}
+      try{cfg.wx=await wxFetch(c);cfg.city=c;cfg.wxAuto=false;saveCfg();show();}catch(e){$('#wx_r').textContent=errMsg(e);}
     };
     $('#wx_t').oninput=function(){
       var t=num(this.value),el=$('#wx_a');
@@ -2080,7 +2129,7 @@ function vBilan(arg){
   '<div class="card"><div class="h2">Argent</div>'+ln('Total des ventes',fmt(s.venT)+' FCFA')+ln('Déjà encaissé',fmt(d.enc)+' FCFA')+
   (d.reste>0?'<div class="line"><span>Reste à encaisser (crédits)</span><b style="color:var(--red)">'+fmt(d.reste)+' FCFA</b></div>':'')+
   '<div class="line"><span>Total des dépenses</span><b style="color:var(--red)">'+fmt(s.depT)+' FCFA</b></div></div>'+
-  '<div class="card"><div class="h2">Dépenses par catégorie</div>'+(d.catRows.length?d.catRows.map(function(c){var p=s.depT?d.cats[c]/s.depT*100:0;return '<div style="margin-bottom:10px"><div class="line" style="padding:0"><span>'+esc(c)+'</span><span><b>'+fmt(d.cats[c])+'</b> <span class="sm">· '+Math.round(p)+' %</span></span></div>'+bar(p,'var(--red)')+'</div>';}).join(''):'<div class="sm">Aucune dépense enregistrée.</div>')+'</div>'+
+  '<div class="card"><div class="h2">Dépenses par catégorie</div>'+(d.catRows.length?d.catRows.map(function(c){var p=s.depT?d.cats[c]/s.depT*100:0;return '<div style="margin-bottom:10px"><div class="line" style="padding:0"><span>'+esc(c)+'</span><span><b>'+fmt(d.cats[c])+'</b> <span class="sm">· '+Math.round(p)+' %</span></span></div>'+bar(p,'var(--red)')+(function(){var it=s.dep.filter(function(x){return x.cat===c;}).sort(function(u,v){return v.date.localeCompare(u.date)||(v.ts||0)-(u.ts||0);});return '<details style="margin-top:6px"><summary class="sm" style="cursor:pointer;color:var(--pDk);font-weight:700">Voir le détail ('+it.length+')</summary>'+it.map(function(x){return '<div class="line" style="padding:6px 0;border-top:1px dashed var(--pB);align-items:flex-start"><span style="min-width:0"><b>'+esc(x.desig||c)+'</b><br><span class="sm">'+fd(x.date)+' · '+fmt1(x.qty)+' '+esc(x.unit||'')+' × '+fmt(x.pu)+(x.four?' · '+esc(x.four):'')+'</span></span><b style="white-space:nowrap;margin-left:8px">'+fmt(x.total)+' F</b></div>';}).join('')+'</details>';})()+'</div>';}).join(''):'<div class="sm">Aucune dépense enregistrée.</div>')+'</div>'+
   (isP(b)?ponteBilan(b,d,ln):'<div class="card"><div class="h2">Poulets et coûts</div>'+ln('Mis en place',b.nb)+ln('Morts','<span class="mort">'+s.dead+' ('+pct(s.rate)+')</span>')+ln('Vendus',s.sold)+ln('Restants vivants',s.alive)+
   '<div style="border-top:1px solid var(--pB);margin:8px 0"></div>'+
   ln('Coût de revient / poulet vendu',s.sold?fmt(s.costSold)+' FCFA':'—')+ln('Prix moyen de vente',s.sold?fmt(s.avgPrice)+' FCFA':'—')+
@@ -2243,6 +2292,7 @@ function route(){
   applyTheme();
   var parts=(location.hash||'#/accueil').split('/'),r=parts[1]||'accueil',arg=parts[2];
   hooks={};curRoute=r;
+  if(cfg.wxAuto===true&&cfg.wx&&Date.now()-cfg.wx.ts>3*3600e3){wxAuto(true).then(function(x){if(x===true&&curRoute==='accueil'){route();}});}
   if(db.kuro&&db.bandes.length){if(!db.bandes.some(isK)){db.bandes.push({id:uid(),nom:'Kuroiler',date:todayISO(),nb:(db.kuro.poules||0)+(db.kuro.coqs||0),type:'kuro',k:db.kuro});}delete db.kuro;save();}
   if(r==='vendeur'){render(vVendeur(),r);return;}
   if(!cfg.role){
@@ -2443,7 +2493,7 @@ function bindStat(){
 /* ---------- Centre : mises à jour + comptage des appareils ---------- */
 var CENTER={proj:'poulebox',key:'AIzaSyDaAkRRkGchPMrBw6oVKb4fhSFb2qptuWM'};
 function cenOn(){return !!(CENTER.proj&&CENTER.key);}
-var WEBVER='3.17.1 web';
+var WEBVER='3.18.0 web';
 function isWeb(){return !(window.AndroidBridge&&window.AndroidBridge.appInfo);}
 function appInfo(){if(isWeb()){return {name:WEBVER,code:999999};}try{var s=window.AndroidBridge&&window.AndroidBridge.appInfo&&window.AndroidBridge.appInfo();if(s){var a=String(s).split('|');return {name:a[0],code:parseInt(a[1],10)||0};}}catch(e){}return null;}
 function devId(){if(isWeb()){return normDev(getDev());}try{return String((window.AndroidBridge&&window.AndroidBridge.deviceId&&window.AndroidBridge.deviceId())||'').replace(/[^A-Z0-9]/g,'');}catch(e){return '';}}
