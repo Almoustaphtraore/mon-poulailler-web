@@ -257,7 +257,7 @@ function load(){
   try{var d=JSON.parse(localStorage.getItem(KEY));if(d&&d.bandes){d.bandes.forEach(function(x){if(x&&/^Bande \d+$/.test(x.nom)){x.nom=x.nom.replace('Bande','Vague');}});return d;}}catch(e){}
   return {bandes:[],depenses:[],morts:[],distrib:[],ventes:[],stock:[],cur:null,kgSac:50};
 }
-function save(){if(!canWrite()){return;}try{localStorage.setItem(KEY,JSON.stringify(db));}catch(e){toast("Impossible d'enregistrer sur ce téléphone");}}
+function save(){if(!canWrite()){return;}try{localStorage.setItem(KEY,JSON.stringify(db));try{if(window.AndroidBridge&&window.AndroidBridge.touchEntry){window.AndroidBridge.touchEntry();}}catch(x){}}catch(e){toast("Impossible d'enregistrer sur ce téléphone");}}
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
 function $(s){return app.querySelector(s);}
 function sum(a,k){return a.reduce(function(t,x){return t+(+x[k]||0);},0);}
@@ -484,8 +484,9 @@ function vReglages(){
   '<div class="sm" style="margin-bottom:10px">'+(cfg.lastBackup?'Dernière sauvegarde : <b>'+fd(cfg.lastBackup)+'</b>':'<span class="mort">Aucune sauvegarde faite pour le moment.</span>')+'<br>Touchez le bouton, puis choisissez <b>Drive</b> dans la liste et validez. Votre fichier est alors gardé en sécurité, même si le téléphone est perdu.</div>'+
   '<div class="row"><button class="btn alt sm" type="button" data-export="1">Exporter</button><button class="btn alt sm" type="button" data-import="1">Importer</button></div>'+
   '<input type="file" id="impfile" accept=".json,application/json" hidden></div>'+
+  (window.AndroidBridge&&window.AndroidBridge.setReminder?'<div class="card"><div class="h2">🔔 Rappel du soir</div><div class="sm" style="margin-bottom:10px">Chaque jour à 18 h, une notification vous rappelle de noter vos dépenses et vos ventes. Elle ne s\'affiche pas si vous avez déjà noté quelque chose dans la journée.</div><button class="btn '+(cfg.rem?'':'alt')+'" type="button" id="rem_t">'+(cfg.rem?'✓ Rappel activé (18 h) — toucher pour couper':'Activer le rappel de 18 h')+'</button></div>':'')+
   '<div class="card"><div class="h2">Statistiques anonymes</div><div class="sm" style="margin-bottom:10px">Mon Poulailler compte anonymement les utilisations pour s\'améliorer. Aucun nom, numéro de téléphone, client ni montant n\'est envoyé.</div><button class="btn alt sm" type="button" id="st_t">'+(cfg.noStat?'Désactivées · toucher pour activer':'Activées · toucher pour désactiver')+'</button></div></div>';
-  return {html:html,theme:'t-green',init:function(){var t=$('#st_t');if(t){t.onclick=function(){cfg.noStat=!cfg.noStat;saveCfg();toast(cfg.noStat?'Statistiques désactivées':'Statistiques activées');route();};}}};
+  return {html:html,theme:'t-green',init:function(){var rt=$('#rem_t');if(rt){rt.onclick=function(){cfg.rem=!cfg.rem;saveCfg();try{window.AndroidBridge.setReminder(!!cfg.rem,18);}catch(e){}toast(cfg.rem?'Rappel activé : tous les jours à 18 h':'Rappel coupé');route();};}var t=$('#st_t');if(t){t.onclick=function(){cfg.noStat=!cfg.noStat;saveCfg();toast(cfg.noStat?'Statistiques désactivées':'Statistiques activées');route();};}}};
 }
 
 /* ---------- Dépenses ---------- */
@@ -1706,7 +1707,7 @@ function vAbo(){
   var html=`<div class="screen"><div class="ttl"><a class="back" href="#/licence" aria-label="Retour">‹</a><h1>S'abonner</h1></div>
   <div class="card" id="ab_pr"><div class="sm">Chargement des prix…</div></div></div>`;
   return {html:html,theme:'t-green',init:async function(){
-    var P=await priceGet(),days=dur,meth='om';
+    var P=await priceGet(),days=dur,meth='om',refWarned=false;
     var el=$('#ab_pr');if(!el){return;}
     var par=(cfg.lreq&&cfg.lreq.par)||'';
     el.innerHTML=`<div class="h2">1. Choisissez la durée</div>${chips('abd',['30 jours · '+fmt(P.p30)+' F','3 mois · '+fmt(P.p90)+' F','1 an · '+fmt(P.p365)+' F'],days===30?'30 jours · '+fmt(P.p30)+' F':days===90?'3 mois · '+fmt(P.p90)+' F':'1 an · '+fmt(P.p365)+' F')}
@@ -1715,14 +1716,22 @@ function vAbo(){
     <div class="h2">3. Confirmez</div>
     <div class="fld"><label class="l" for="ab_n">Votre nom</label><input class="in" id="ab_n" type="text" value="${esc((cfg.lreq&&cfg.lreq.nom)||'')}"></div>
     <div class="fld"><label class="l" for="ab_t">Votre numéro (celui qui a payé)</label><input class="in" id="ab_t" type="text" inputmode="tel" value="${esc((cfg.lreq&&cfg.lreq.tel)||'')}"></div>
-    <div class="fld"><label class="l" for="ab_r">Référence du paiement (facultatif)</label><input class="in" id="ab_r" type="text"></div>
+    <div class="fld"><label class="l" for="ab_r">Référence du paiement (recommandée)</label><input class="in" id="ab_r" type="text"></div>
     <div class="fld"><label class="l" for="ab_p">Code de parrain (facultatif)</label><input class="in" id="ab_p" type="text" autocapitalize="characters" placeholder="Code de la personne qui vous a conseillé" value="${esc(par)}"></div>
     <button class="btn" type="button" id="ab_go">J'ai payé</button>
     <div class="sm" style="margin-top:10px">Dès que le paiement est vérifié, votre abonnement s'active tout seul sur ce téléphone (ouvrez l'application avec internet).</div>`;
     function price(){return days===30?P.p30:days===90?P.p90:P.p365;}
     function how(){
       var num=meth==='om'?P.om:P.wave,nm=meth==='om'?'Orange Money':'Wave';
-      $('#ab_how').innerHTML=`Envoyez <b>${fmt(price())} FCFA</b> par <b>${nm}</b> au numéro :<div class="big" style="letter-spacing:1px;margin:6px 0">${esc(num)}</div>${P.msg?`<div class="sm">${esc(P.msg)}</div>`:''}<button class="btn alt sm" type="button" id="ab_cp">Copier le numéro</button>`;
+      $('#ab_how').innerHTML=`Envoyez <b>${fmt(price())} FCFA</b> par <b>${nm}</b> au numéro :<div class="big" style="letter-spacing:1px;margin:6px 0">${esc(num)}</div>${P.msg?`<div class="sm">${esc(P.msg)}</div>`:''}<button class="btn alt sm" type="button" id="ab_cp">Copier le numéro</button>
+      <button class="btn sm" type="button" id="ab_op" style="margin-top:8px">${meth==='om'?'Ouvrir Max it (Orange)':'Ouvrir Wave'}</button>
+      <div class="sm" style="margin-top:6px">Faites le paiement dans l'application, puis revenez ici et touchez « J'ai payé ». Notez la <b>référence</b> reçue par SMS.</div>`;
+      $('#ab_op').onclick=function(){
+        var B=window.AndroidBridge,w=meth==='om'?'maxit':'wave';
+        if(B&&B.openPayApp){var ok=false;try{ok=B.openPayApp(w);}catch(e){}
+          if(!ok){toast(meth==='om'?'Max it introuvable sur ce téléphone. Ouverture du Play Store…':'Wave introuvable sur ce téléphone. Ouverture du Play Store…');try{B.storeSearch(meth==='om'?'Max it Orange':'Wave Mobile Money');}catch(e){}}
+        }else{toast('Ouvrez '+(meth==='om'?'Max it ou Orange Money':'Wave')+' sur votre téléphone');}
+      };
       $('#ab_cp').onclick=function(){toast(copyText(num)?'Numéro copié':'Copie impossible');};
     }
     how();
@@ -1734,6 +1743,7 @@ function vAbo(){
     $('#ab_go').onclick=async function(){
       var nom=$('#ab_n').value.trim(),tel=$('#ab_t').value.trim();
       if(!nom||!tel){toast('Entrez votre nom et votre numéro');return;}
+      if(!$('#ab_r').value.trim()&&!refWarned){refWarned=true;toast('Entrez la référence reçue par SMS pour une activation plus rapide. Touchez encore « J\'ai payé » pour envoyer quand même.');return;}
       var pa=normDev($('#ab_p').value);if(pa&&pa===myCode()){toast('Vous ne pouvez pas vous parrainer vous-même');return;}
       var o={nom:nom,tel:tel,days:days,amt:price(),meth:meth==='om'?'Orange Money':'Wave',ref:$('#ab_r').value.trim(),par:pa};
       try{
@@ -2493,7 +2503,7 @@ function bindStat(){
 /* ---------- Centre : mises à jour + comptage des appareils ---------- */
 var CENTER={proj:'poulebox',key:'AIzaSyDaAkRRkGchPMrBw6oVKb4fhSFb2qptuWM'};
 function cenOn(){return !!(CENTER.proj&&CENTER.key);}
-var WEBVER='3.18.0 web';
+var WEBVER='3.19.0 web';
 function isWeb(){return !(window.AndroidBridge&&window.AndroidBridge.appInfo);}
 function appInfo(){if(isWeb()){return {name:WEBVER,code:999999};}try{var s=window.AndroidBridge&&window.AndroidBridge.appInfo&&window.AndroidBridge.appInfo();if(s){var a=String(s).split('|');return {name:a[0],code:parseInt(a[1],10)||0};}}catch(e){}return null;}
 function devId(){if(isWeb()){return normDev(getDev());}try{return String((window.AndroidBridge&&window.AndroidBridge.deviceId&&window.AndroidBridge.deviceId())||'').replace(/[^A-Z0-9]/g,'');}catch(e){return '';}}
@@ -2622,7 +2632,8 @@ function cenBind(){
 /* ---------- Notifications Android en arrière-plan ---------- */
 function syncPoll(){
   try{
-    var B=window.AndroidBridge;if(!B||!B.setPoll){return;}
+    var B=window.AndroidBridge;if(B&&B.setReminder&&cfg.rem){try{B.setReminder(true,18);}catch(e){}}
+    if(!B||!B.setPoll){return;}
     if(cfg.role==='owner'&&cfg.fb&&cfg.fb.proj&&cfg.fb.key&&cfg.fb.mail&&canAdv()){B.setPoll(JSON.stringify({role:'owner',proj:cfg.fb.proj,key:cfg.fb.key,mail:cfg.fb.mail,pass:cfg.fb.pass,pre:cfg.fb.pre||''}));}
     else if(cfg.role==='worker'&&cfg.worker){B.setPoll(JSON.stringify({role:'worker',proj:cfg.worker.proj,key:cfg.worker.key,pre:cfg.worker.pre||'',tok:cfg.worker.tok||'',sTs:String((cfg.state&&cfg.state.statTs)||'')}));}
   }catch(e){}
